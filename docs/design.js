@@ -3,7 +3,7 @@
 'use strict';
 const M=typeof module!=='undefined'&&module.exports?require('./model.js'):root.DialyzerModel;
 const F=1e-6/60,MMHG=133.322387415;
-const defaults={feedFlow_mLmin:100,hydraulicMode:'Lp',darcy_m2:3.343574515699709e-18,area_m2:M.geometry.area,length_mm:218,diameter_um:2*M.geometry.ri*1e6,thickness_um:(M.geometry.ro-M.geometry.ri)*1e6,packing:.5,porosity:.5205,tortuosity:Math.SQRT2,membraneDiffusivity:1.9e-9,hindrance:1,Lp:32,muPore:.00100299,muWater:.00100299,muBlood:.0035,rheology:'carreau',mu0:.0225,muInf:.0022,carreauTime:.11,carreauN:.392,carreauA:.644,hematocrit:.35,plasmaWater:.93,rbcWater:.72,waterDiffusivity:1.9e-9,bloodDiffusivity:7.4e-10,dialysateDiffusivity:1.9e-9,ShBlood:3.66,ShDialysate:3.66,cells:100};
+const defaults={feedFlow_mLmin:100,hydraulicMode:'Lp',darcy_m2:3.343574515699709e-18,area_m2:M.geometry.area,length_mm:218,diameter_um:2*M.geometry.ri*1e6,thickness_um:(M.geometry.ro-M.geometry.ri)*1e6,packing:.5,porosity:.5205,tortuosity:Math.SQRT2,membraneDiffusivity:1.9e-9,hindrance:1,Lp:32,muPore:.00100299,muWater:.00100299,muBlood:.0035,rheology:'carreau',mu0:.0225,muInf:.0022,carreauTime:.11,carreauN:.392,carreauA:.644,hematocrit:.35,plasmaWater:.93,rbcWater:.72,waterDiffusivity:1.9e-9,bloodDiffusivity:7.4e-10,dialysateDiffusivity:1.9e-9,ShBlood:4.36,ShDialysate:3.66,cells:100};
 function need(v,m){if(!v)throw Error(m);}
 function validate(input){
  const p={...defaults,...input};
