@@ -56,7 +56,7 @@ $('export').addEventListener('click',safe(()=>{updateStatic();download('dialyzer
 $('template').addEventListener('click',()=>download('steady-template.csv','qd_mlmin,clearance_water_mlmin,qb_mlmin,uf_net_mlmin\n','text/csv'));
 $('restore').addEventListener('click',safe(()=>{custom=null;$('steadyFile').value='';configure();}));
 $('steadyFile').addEventListener('change',async()=>{try{if(!$('steadyFile').files.length)return;const file=$('steadyFile').files[0],fluid=$('importFluid').value;const candidate=M.importSteady(await file.text(),{name:$('importName').value.trim()||file.name,qb:Number($('importQb').value),fw:fluid==='water'?1:Number($('importFw').value),fluid,source:'User-imported CSV: '+file.name});custom=candidate;$('fluid').value=fluid;$('status').hidden=true;configure();}catch(e){$('status').textContent=e.message;$('status').hidden=false;}});
-document.querySelectorAll('[data-property]').forEach(e=>e.addEventListener('change',safe(()=>{if(custom)throw Error('Restore a built-in preset before exploring membrane designs.');$('designEnabled').checked=true;updateStatic();})));
+document.querySelectorAll('[data-property]').forEach(e=>e.addEventListener('input',safe(()=>{if(custom)throw Error('Restore a built-in preset before exploring membrane designs.');$('designEnabled').checked=true;updateStatic();})));
 $('designEnabled').addEventListener('change',safe(()=>{if(custom){$('designEnabled').checked=false;throw Error('Restore a built-in preset before enabling design exploration.');}updateStatic();}));
 $('resetDesign').addEventListener('click',safe(()=>{resetDesign();updateStatic();}));
 resetDesign();safe(configure)();
