@@ -9,3 +9,24 @@
 button,a,option{color:#fff}.secondary{color:#fff}input[type=checkbox],input[type=range]{accent-color:#8fc7ef}input:disabled{opacity:.6}input::file-selector-button{background:#155276;color:#fff;border:1px solid var(--line);border-radius:4px;padding:7px}::selection{background:#397ba5;color:#fff}.chart circle{fill:#fff;stroke:#003153}.chart path{stroke:#fff}.chart line{stroke:#4d7b98}
 
 .collaboratorLogo .hematicaWordmark img,.validationCredit .hematicaWordmark img{width:137px;height:47px;object-fit:contain}@media(max-width:730px){.collaboratorLogo .hematicaWordmark img,.validationCredit .hematicaWordmark img{width:103px;height:36px}}
+
+/* Hematica accents: Prussian blue foundation, red actions, ice-blue detail. */
+:root{--hematica-red:#b43535;--hematica-blue:#a1c2d5;--muted:#d2e2ec;--orange:#ef8585}
+h1 em,.eyebrow,.footerLabel,.filterIdentity span,.authorCredit .footerLabel{color:var(--hematica-blue)}
+.brand span{color:var(--hematica-blue)}
+nav button.active{color:#fff;border-bottom-color:var(--hematica-red)}
+.dot{background:var(--hematica-red);box-shadow:0 0 0 3px rgba(180,53,53,.15)}
+.mainMetric{background:var(--hematica-red);border-color:#d16666;color:#fff}
+.mainMetric span,.mainMetric small{color:#fff}
+.primary{background:var(--hematica-red);border-color:#d16666;color:#fff}
+.primary:hover{background:#982b2b;border-color:#e28a8a}
+.secondary:hover,.quickFlows button:hover{background:#155276;border-color:var(--hematica-blue)}
+input[type=range],input[type=checkbox]{accent-color:var(--hematica-blue)}
+input:focus,select:focus,button:focus-visible{outline-color:var(--hematica-blue)}
+.notice{border-left-color:var(--hematica-red)}
+.designPanel{border-top:3px solid var(--hematica-blue)}
+.contactCards article:first-child{border-top:3px solid var(--hematica-blue)}
+.contactCards article:last-child{border-top:3px solid var(--hematica-red)}
+.contactCards a{color:#fff}.contactCards a:hover{color:var(--hematica-blue)}
+.legend b{color:#ef8585}.chart circle{fill:#ef8585;stroke:#003153}.chart path{stroke:var(--hematica-blue)}.legend i{background:var(--hematica-blue)}
+.tag{color:var(--hematica-blue);border-color:#5c8ba6}
