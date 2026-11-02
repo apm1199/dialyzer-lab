@@ -4,7 +4,7 @@ let custom=null,last=null,dynamicResult=null;
 const f=(x,n=2)=>Number(x).toLocaleString('en-GB',{minimumFractionDigits:n,maximumFractionDigits:n});
 function safe(fn){return (...args)=>{try{$('status').hidden=true;return fn(...args);}catch(e){$('status').textContent=e.message;$('status').hidden=false;}};}
 function download(name,content,type='text/plain'){const a=document.createElement('a'),u=URL.createObjectURL(new Blob([content],{type}));a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),500);}
-function dataset(){return custom||M.paper[$('fluid').value];}
+function dataset(){return custom||M.presets[$('fluid').value];}
 function chart(target,series,points,{xLabel='Qd · mL/min',yLabel='Clearance · mL/min',split=null}={}){
  const all=[...series,...points];if(!all.length)return;
  const w=700,h=300,l=65,r=22,t=25,b=52;
@@ -26,20 +26,20 @@ function updateData(){
  tableRows('dataRows',d.rows.map(r=>{const p=M.predict(d,r[0]);return[f(r[0]),f(r[1]),f(p.kWater),f(p.koa,1)];}));
  const cv=M.crossValidate(d);$('cv').textContent=cv.rmse===null?'At least three points are needed to omit an interior node.':`Held-out RMSE: ${f(cv.rmse,3)} mL/min. An internal check of the reduction, not independent experimental validation.`;
  tableRows('cvRows',cv.points.map(p=>[f(p.qd),f(p.observed),f(p.predicted),f(p.error,3)]));
- $('lowCheck').hidden=!d.paperCorrelation;
- if(d.paperCorrelation){
-  $('lowCheck').textContent=d.fluid==='water'?`Low-flow check, not fitted: at Qd = 5 mL/min the reduced model predicts ${f(M.predict(d,5).kWater,3)} mL/min; the paper reports approximately 4.66 mL/min in water CFD. The difference is ${f(100*(M.predict(d,5).kWater/4.66-1),2)}%. This compares models, not raw experiments.`:'No blood references below 41.67 mL/min are available here. That portion of the curve is a reduced-model prediction, not a validated blood result.';
+ $('lowCheck').hidden=!d.correlationModel;
+ if(d.correlationModel){
+  $('lowCheck').textContent=d.fluid==='water'?`Numerical cross-check, not fitted: at Qd = 5 mL/min the reduced model predicts ${f(M.predict(d,5).kWater,3)} mL/min; the numerical benchmark is approximately 4.66 mL/min. The difference is ${f(100*(M.predict(d,5).kWater/4.66-1),2)}%. This compares models, not raw experiments.`:'The blood dataset starts at 41.67 mL/min. That portion of the curve is a reduced-model prediction, not a validated blood result.';
  }
  const roles={0:'Imposed boundary',5:'Correlation prediction',17.5:'Identified coefficient',41.67:'Identified coefficient',66.67:'Identified coefficient',100:'Correlation prediction',133.33:'Identified coefficient'};
- tableRows('correlationRows',[0,5,17.5,41.67,66.67,100,133.33].map(q=>[f(q),M.paperDapp(q).toExponential(6),roles[q]]));
+ tableRows('correlationRows',[0,5,17.5,41.67,66.67,100,133.33].map(q=>[f(q),M.effectiveDapp(q).toExponential(6),roles[q]]));
 }
 function updateStatic(){
  const d=dataset(),qd=Number($('qd').value),cin=Number($('cin').value);last=M.predict(d,qd,cin);
  const set=(id,val)=>$(id).textContent=val;
  set('k',f(last.kWater));set('koa',f(last.koa,1));set('removal',f(last.removal_mgmin,2));set('cb',f(last.cBulkOut,4)+' kg/m³');set('cd',last.cDialysateOut===null?'N/A · no effluent':f(last.cDialysateOut,4)+' kg/m³');set('kbulk',f(last.kBulk)+' mL/min');set('qb',f(d.qb,2)+' mL/min');set('qw',f(last.qw,2)+' mL/min');
- set('sourceTag',custom?'IMPORTED DATA':'PAPER CORRELATION');
+ set('sourceTag',custom?'IMPORTED DATA':'TRANSPORT MODEL');
  set('dappValue',last.dapp===null?'N/A · imported model':last.dapp.toExponential(6)+' m²/s');set('factorValue',last.equivalentFactor===null?'N/A · direct K₀A interpolation':f(last.equivalentFactor,6));
- set('predictionNotice',qd===0?'Zero-flow limit: no net steady solute removal. Dialysate effluent concentration is not defined.':custom?'Imported-data model: interpolation within the measured flow range.':d.fluid==='blood'&&qd<41.67?'Low-flow blood prediction: the paper Dapp is retained and the equivalent factor is continued below the available blood references. This region has not been validated against blood data.':d.fluid==='water'&&qd<17.5?'Low-flow water prediction: Dapp follows the paper; the equivalent factor is held at its first reference value. The rounded 5 mL/min CFD result is a separate reduction check.':'Paper-based reduced prediction: Dapp plus an identified equivalent factor. Geometry, feed flow and net UF are fixed to the reference configuration.');
+ set('predictionNotice',qd===0?'Zero-flow limit: no net steady solute removal. Dialysate effluent concentration is not defined.':custom?'Imported-data model: interpolation within the measured flow range.':d.fluid==='blood'&&qd<41.67?'Low-flow blood prediction: the transport correlation is retained and the equivalent factor is continued below the available blood dataset. This region has not been validated against blood data.':d.fluid==='water'&&qd<17.5?'Low-flow water prediction: the effective diffusivity follows the transport correlation; the equivalent factor is held at its first calibration value.':'Reduced-model prediction: Dapp plus an identified equivalent factor. Geometry, feed flow and net UF are fixed to the preset configuration.');
  set('sourceNote',custom?`${d.name}. User-imported data; the filter and conditions must match the experiment. No independent validation is implied.`:d.source);
  const [x0,x1]=M.domain(d),curve=Array.from({length:201},(_,i)=>{const q=i===200?x1:x0+(x1-x0)*i/200;return[q,M.predict(d,q).kWater];});chart('staticChart',curve,d.rows);updateData();
 }
@@ -55,7 +55,7 @@ for(const b of document.querySelectorAll('[data-tab]'))b.addEventListener('click
 for(const button of document.querySelectorAll('[data-flow]'))button.addEventListener('click',safe(()=>{$('qd').value=button.dataset.flow;$('qdRange').value=button.dataset.flow;updateStatic();}));
 $('fluid').addEventListener('change',safe(()=>{custom=null;configure();}));
 $('qd').addEventListener('input',safe(()=>{$('qdRange').value=$('qd').value;updateStatic();}));$('qdRange').addEventListener('input',safe(()=>{$('qd').value=$('qdRange').value;updateStatic();}));$('cin').addEventListener('input',safe(updateStatic));
-$('export').addEventListener('click',safe(()=>{updateStatic();download('dialyzer-result.json',JSON.stringify({version:'0.2.0',created:new Date().toISOString(),model:'Paper Dapp correlation + identified equivalent factor + countercurrent exchanger; imported data use direct KoA interpolation; CVVHD, zero net UF',dataset:dataset(),result:last,crossValidation:M.crossValidate(dataset()),dynamic:dynamicResult,limitations:['Fixed geometry, Qb, fluid and zero net UF per dataset','No local Jv prediction','No geometry sensitivity identified','Reduced-model validation is distinct from the paper CFD validation','Blood predictions below 41.67 mL/min are not validated','Equivalent factor is held constant below the first reference']},null,2),'application/json');}));
+$('export').addEventListener('click',safe(()=>{updateStatic();download('dialyzer-result.json',JSON.stringify({version:'0.2.1',created:new Date().toISOString(),model:'Effective diffusivity correlation + identified equivalent factor + countercurrent exchanger; imported data use direct KoA interpolation; CVVHD, zero net UF',dataset:dataset(),result:last,crossValidation:M.crossValidate(dataset()),dynamic:dynamicResult,limitations:['Fixed geometry, Qb, fluid and zero net UF per dataset','No local Jv prediction','No geometry sensitivity identified','Reduced-model checks do not replace independent experimental validation','Blood predictions below 41.67 mL/min are not validated','Equivalent factor is held constant below the first calibration point']},null,2),'application/json');}));
 $('template').addEventListener('click',()=>download('steady-template.csv','qd_mlmin,clearance_water_mlmin,qb_mlmin,uf_net_mlmin\n','text/csv'));
 $('restore').addEventListener('click',safe(()=>{custom=null;$('steadyFile').value='';configure();}));
 $('steadyFile').addEventListener('change',async()=>{try{if(!$('steadyFile').files.length)return;const file=$('steadyFile').files[0],fluid=$('importFluid').value;const candidate=M.importSteady(await file.text(),{name:$('importName').value.trim()||file.name,qb:Number($('importQb').value),fw:fluid==='water'?1:Number($('importFw').value),fluid,source:'User-imported CSV: '+file.name});custom=candidate;$('fluid').value=fluid;$('status').hidden=true;configure();}catch(e){$('status').textContent=e.message;$('status').hidden=false;}});

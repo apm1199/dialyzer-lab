@@ -1,31 +1,31 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const M=require('../docs/model.js');
 const close=(a,b,t=1e-8)=>assert.ok(Math.abs(a-b)<t,`${a} != ${b}`);
 test('exchanger conversion and physical limits, including equal flows',()=>{for(const qw of [20,85.65,100,300])for(const qd of [5,20,100,133.33])for(const koa of [1e-6,1,10,200,1000]){const k=M.kFromKoa(koa,qw,qd);assert.ok(k>=0&&k<=Math.min(qw,qd));if(k<.999999*Math.min(qw,qd))close(M.koaFromK(k,qw,qd),koa,1e-4);}close(M.kFromKoa(100,100,100),50);});
-test('paper nodes reproduced; solute conservation in water and blood',()=>{for(const d of Object.values(M.paper))for(const [qd,k]of d.rows){const r=M.predict(d,qd);close(r.kWater,k);close(r.qw*r.cWaterIn-r.qw*r.cWaterOut,qd*r.cDialysateOut);close(r.kBulk*d.fw,r.kWater);}});
-test('concentration scales removal but not clearance',()=>{const a=M.predict(M.paper.blood,80,.885),b=M.predict(M.paper.blood,80,1.77);close(a.kWater,b.kWater);close(a.removal_mgmin*2,b.removal_mgmin);});
-test('interpolated clearance respects supply bounds',()=>{for(const d of Object.values(M.paper))for(let q=41.67;q<=133.33;q+=.25){const r=M.predict(d,q);assert.ok(r.kWater>0&&r.kWater<Math.min(r.qw,q));}});
-test('extrapolation, duplicate nodes and nonzero UF rejected',()=>{assert.throws(()=>M.predict(M.paper.water,-.01));assert.throws(()=>M.validateDataset({...M.paper.water,rows:[[50,30],[50,31]]}));assert.throws(()=>M.importSteady('qd_mlmin,clearance_water_mlmin,uf_net_mlmin\n50,30,1\n60,35,1',M.paper.water));});
-test('CSV import supports decimal commas with semicolon delimiter',()=>{const d=M.importSteady('qd_mlmin;clearance_water_mlmin;qb_mlmin\n50,5;30,5;100\n70;50;100',M.paper.water);close(d.rows[0][0],50.5);assert.throws(()=>M.importSteady('qd_mlmin,clearance_water_mlmin\n50,\n60,40',M.paper.water));});
-test('leave-one-out excludes endpoints and does not train on held-out node',()=>{const c=M.crossValidate(M.paper.water);assert.equal(c.points.length,3);assert.ok(c.rmse>0);});
+test('built-in nodes reproduced; solute conservation in water and blood',()=>{for(const d of Object.values(M.presets))for(const [qd,k]of d.rows){const r=M.predict(d,qd);close(r.kWater,k);close(r.qw*r.cWaterIn-r.qw*r.cWaterOut,qd*r.cDialysateOut);close(r.kBulk*d.fw,r.kWater);}});
+test('concentration scales removal but not clearance',()=>{const a=M.predict(M.presets.blood,80,.885),b=M.predict(M.presets.blood,80,1.77);close(a.kWater,b.kWater);close(a.removal_mgmin*2,b.removal_mgmin);});
+test('interpolated clearance respects supply bounds',()=>{for(const d of Object.values(M.presets))for(let q=41.67;q<=133.33;q+=.25){const r=M.predict(d,q);assert.ok(r.kWater>0&&r.kWater<Math.min(r.qw,q));}});
+test('extrapolation, duplicate nodes and nonzero UF rejected',()=>{assert.throws(()=>M.predict(M.presets.water,-.01));assert.throws(()=>M.validateDataset({...M.presets.water,rows:[[50,30],[50,31]]}));assert.throws(()=>M.importSteady('qd_mlmin,clearance_water_mlmin,uf_net_mlmin\n50,30,1\n60,35,1',M.presets.water));});
+test('CSV import supports decimal commas with semicolon delimiter',()=>{const d=M.importSteady('qd_mlmin;clearance_water_mlmin;qb_mlmin\n50,5;30,5;100\n70;50;100',M.presets.water);close(d.rows[0][0],50.5);assert.throws(()=>M.importSteady('qd_mlmin,clearance_water_mlmin\n50,\n60,40',M.presets.water));});
+test('leave-one-out excludes endpoints and does not train on held-out node',()=>{const c=M.crossValidate(M.presets.water);assert.equal(c.points.length,3);assert.ok(c.rmse>0);});
 test('Darcy conversion and membrane conductance',()=>{const r=M.membrane({thickness_um:50,Lp:32,mu:.001,area:1,D:1.9e-9,eps:.5,tau:2});close(r.darcy/1e-18,3.333607003758472,1e-10);close(r.Deff,4.75e-10,1e-18);close(r.membraneKoa,570);});
 test('step identification recovers known parameters with held-out data',()=>{const t=Array.from({length:121},(_,i)=>i*2),p={y0:.2,gain:.6,du:1,tStep:20,tau:30,delay:6},y=M.stepResponse(t,p);const csv='time_s,input,output\n'+t.map((v,i)=>`${v},${v<20?1:2},${y[i]}`).join('\n');const fit=M.identifyStep(csv);close(fit.gain,p.gain,.025);close(fit.tau,p.tau,3);close(fit.delay,p.delay,2);assert.ok(fit.rmseHoldout<.01);assert.ok(fit.split<t.length);});
 test('no transient or multiple input steps cannot identify a single step',()=>{let text='time_s,input,output\n';for(let i=0;i<30;i++)text+=`${i},1,.2\n`;assert.throws(()=>M.identifyStep(text));text='time_s,input,output\n';for(let i=0;i<30;i++)text+=`${i},${i<5?1:i<20?2:3},${i/100}\n`;assert.throws(()=>M.identifyStep(text));});
 
-test('floating-point endpoint roundoff is accepted, extrapolation is rejected',()=>{close(M.predict(M.paper.blood,133.33+1e-13).kWater,76.53);assert.throws(()=>M.predict(M.paper.blood,133.331));});
+test('floating-point endpoint roundoff is accepted, extrapolation is rejected',()=>{close(M.predict(M.presets.blood,133.33+1e-13).kWater,76.53);assert.throws(()=>M.predict(M.presets.blood,133.331));});
 
-// Reference values transcribed from paper Appendix C, not generated by the model.
-test('full paper Dapp correlation matches identified and predicted values',()=>{
- for(const [q,d]of [[0,0],[5,7.866723070416e-12],[17.5,4.326898176908e-11],[41.67,1.8326875e-10],[66.67,2.56355e-10],[100,2.958149200032e-10],[133.33,3.250668012693e-10]])close(M.paperDapp(q),d,1e-22);
+// Reference values transcribed from built-in Appendix C, not generated by the model.
+test('full built-in Dapp correlation matches identified and predicted values',()=>{
+ for(const [q,d]of [[0,0],[5,7.866723070416e-12],[17.5,4.326898176908e-11],[41.67,1.8326875e-10],[66.67,2.56355e-10],[100,2.958149200032e-10],[133.33,3.250668012693e-10]])close(M.effectiveDapp(q),d,1e-22);
 });
 test('zero flow is finite, conservative and has no effluent concentration',()=>{
- for(const d of Object.values(M.paper)){const r=M.predict(d,0);close(r.kWater,0);close(r.koa,0);close(r.removal_mgmin,0);close(r.cBulkOut,.885);assert.equal(r.cDialysateOut,null);assert.equal(r.dapp,0);assert.ok(!JSON.stringify(r).includes('NaN'));}
+ for(const d of Object.values(M.presets)){const r=M.predict(d,0);close(r.kWater,0);close(r.koa,0);close(r.removal_mgmin,0);close(r.cBulkOut,.885);assert.equal(r.cDialysateOut,null);assert.equal(r.dapp,0);assert.ok(!JSON.stringify(r).includes('NaN'));}
 });
 test('full-domain water and blood curves are bounded and monotone',()=>{
- for(const d of Object.values(M.paper)){let prev=0;for(let q=.01;q<=133.33;q+=.1){const r=M.predict(d,q);assert.ok(r.kWater>=prev-1e-9);assert.ok(r.kWater>0&&r.kWater<=Math.min(q,r.qw));assert.ok(r.equivalentFactor>0);close(r.qw*r.cWaterIn-r.qw*r.cWaterOut,q*r.cDialysateOut);prev=r.kWater;}}
+ for(const d of Object.values(M.presets)){let prev=0;for(let q=.01;q<=133.33;q+=.1){const r=M.predict(d,q);assert.ok(r.kWater>=prev-1e-9);assert.ok(r.kWater>0&&r.kWater<=Math.min(q,r.qw));assert.ok(r.equivalentFactor>0);close(r.qw*r.cWaterIn-r.qw*r.cWaterOut,q*r.cDialysateOut);prev=r.kWater;}}
 });
 test('low-flow predictions are not inserted as blood reference data',()=>{
- assert.equal(M.paper.blood.rows[0][0],41.67);assert.equal(M.paper.water.rows[0][0],17.5);assert.equal(M.predict(M.paper.blood,5).status,'Low-flow model prediction');assert.equal(M.paper.water.checks[0][0],5);const r=M.predict(M.paper.water,5);assert.ok(Math.abs(r.kWater-4.66)/4.66<.02);
+ assert.equal(M.presets.blood.rows[0][0],41.67);assert.equal(M.presets.water.rows[0][0],17.5);assert.equal(M.predict(M.presets.blood,5).status,'Low-flow model prediction');assert.equal(M.presets.water.checks[0][0],5);const r=M.predict(M.presets.water,5);assert.ok(Math.abs(r.kWater-4.66)/4.66<.02);
 });
-test('imported data do not silently inherit the paper correlation',()=>{
- const d=M.importSteady('qd_mlmin,clearance_water_mlmin\n50,30\n70,40',M.paper.water);assert.equal(d.paperCorrelation,false);assert.deepEqual(M.domain(d),[50,70]);assert.throws(()=>M.predict(d,0));close(M.predict(d,50).kWater,30);
+test('imported data do not silently inherit the built-in correlation',()=>{
+ const d=M.importSteady('qd_mlmin,clearance_water_mlmin\n50,30\n70,40',M.presets.water);assert.equal(d.correlationModel,false);assert.deepEqual(M.domain(d),[50,70]);assert.throws(()=>M.predict(d,0));close(M.predict(d,50).kWater,30);
 });

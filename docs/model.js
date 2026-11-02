@@ -5,7 +5,7 @@ const FLOW=1e-6/60;
 const geometry={ri:1.076024136551e-4,ro:1.576500479132e-4,length:.218,fibers:7500,lc:4.109708596949e-5};
 geometry.area=2*Math.PI*geometry.ri*geometry.length*geometry.fibers;
 const dappNodes={x:[0,17.5,41.67,66.67,133.33],y:[0,4.326898176908e-11,1.8326875e-10,2.56355e-10,3.250668012693e-10]};
-const paper={water:{name:'Water · paper-based reduced model',qb:100,fw:1,fluid:'water',paperCorrelation:true,source:'Paper_APM - draft.pdf, Sections 2.7 and Appendix C; Table 4. Water references: 17, 41, 62, 88 are calibration targets; 78 at Qd=100 is an aqueous comparison, not a manufacturer specification. The 5 mL/min CFD check is rounded (~4.66). Not raw experimental samples.',rows:[[17.5,17],[41.67,41],[66.67,62],[100,78],[133.33,88]],checks:[[5,4.66]]},blood:{name:'Blood · paper-based reduced model',qb:100,fw:.8565,fluid:'blood',paperCorrelation:true,source:'Paper_APM - draft.pdf, Table 4 and Appendix C. Blood-water-referenced CFD clearance; Hct=.35, plasma water=.93, RBC water=.72, Carreau-Yasuda. Below 41.67 mL/min: reduced-model predictions, not validated blood results.',rows:[[41.67,40.47],[66.67,58.71],[100,71.01],[133.33,76.53]],checks:[]}};
+const presets={water:{name:'Water · default transport model',qb:100,fw:1,fluid:'water',correlationModel:true,source:'Model informed by literature and numerical datasets.',rows:[[17.5,17],[41.67,41],[66.67,62],[100,78],[133.33,88]],checks:[[5,4.66]]},blood:{name:'Blood · default transport model',qb:100,fw:.8565,fluid:'blood',correlationModel:true,source:'Model informed by literature and numerical datasets.',rows:[[41.67,40.47],[66.67,58.71],[100,71.01],[133.33,76.53]],checks:[]}};
 function need(v,msg){if(!v)throw Error(msg);}
 function finite(x){return Number.isFinite(x);}
 function koaFromK(k,qw,qd){
@@ -44,36 +44,36 @@ function validateDataset(d){
  rows.forEach((r,i)=>{koaFromK(r[1],d.qb*d.fw,r[0]);need(!i||r[0]>rows[i-1][0],'Duplicate flows: aggregate replicates before importing.');});
  return {...d,rows};
 }
-function paperDapp(qd){
- need(finite(qd)&&qd>=0&&qd<=133.33+1e-10,'Paper model domain: 0 to 133.33 mL/min.');
+function effectiveDapp(qd){
+ need(finite(qd)&&qd>=0&&qd<=133.33+1e-10,'Model domain: 0 to 133.33 mL/min.');
  const {x,y}=dappNodes,m=pchipSlopes(x,y);m[m.length-1]=(y.at(-1)-y.at(-2))/(x.at(-1)-x.at(-2));
  return interpolate(x,y,Math.min(133.33,qd),m);
 }
 function transportNodes(d){
  const qw=d.qb*d.fw;
  return d.rows.map(([q,k])=>{
-  const koa=koaFromK(k,qw,q),membraneKoa=geometry.area*paperDapp(q)/geometry.lc/FLOW;
+  const koa=koaFromK(k,qw,q),membraneKoa=geometry.area*effectiveDapp(q)/geometry.lc/FLOW;
   return [q,koa/membraneKoa];
  });
 }
-function domain(d){return d.paperCorrelation?[0,133.33]:[d.rows[0][0],d.rows.at(-1)[0]];}
+function domain(d){return d.correlationModel?[0,133.33]:[d.rows[0][0],d.rows.at(-1)[0]];}
 function predict(dataset,qd,cBulk=.885){
  const d=validateDataset(dataset);need(finite(cBulk)&&cBulk>0,'A positive inlet concentration is required.');
  const [lo,hi]=domain(d);need(finite(qd)&&qd>=lo-1e-10&&qd<=hi+1e-10,'Flow outside the supported model domain.');
  qd=Math.max(lo,Math.min(hi,qd));const qw=d.qb*d.fw,cw=cBulk/d.fw;
  let koa,dapp=null,rm=null,factor=null;
- if(d.paperCorrelation){
-  dapp=paperDapp(qd);
+ if(d.correlationModel){
+  dapp=effectiveDapp(qd);
   const nodes=transportNodes(d),qnode=Math.max(nodes[0][0],Math.min(nodes.at(-1)[0],qd));
   factor=interpolate(nodes.map(r=>r[0]),nodes.map(r=>r[1]),qnode);
   // Below the first reference, hold the identified equivalent transport factor fixed.
-  // This continuation is a reduced-model assumption, not a new CFD result.
+  // This continuation is a reduced-model assumption, not an additional resolved flow calculation.
   if(qd===0){rm=null;koa=0;}else{rm=geometry.lc/dapp;koa=factor*geometry.area/rm/FLOW;}
  }else{
   const x=d.rows.map(r=>r[0]),y=d.rows.map(r=>koaFromK(r[1],qw,r[0]));koa=interpolate(x,y,qd);
  }
  const k=qd===0?0:kFromKoa(koa,qw,qd);
- const status=qd===0?'Zero-flow limit':d.paperCorrelation&&qd<d.rows[0][0]?'Low-flow model prediction':d.paperCorrelation?'Paper-based reduced prediction':'Imported-data interpolation';
+ const status=qd===0?'Zero-flow limit':d.correlationModel&&qd<d.rows[0][0]?'Low-flow model prediction':d.correlationModel?'Reduced-model prediction':'Imported-data interpolation';
  return {qd,qb:d.qb,qw,koa,kWater:k,kBulk:k/d.fw,cWaterIn:cw,cWaterOut:cw*(1-k/qw),cBulkOut:cBulk*(1-k/qw),cDialysateOut:qd===0?null:k*cw/qd,removal_mgmin:k*cw,netUF:0,dapp,membraneResistance_s_m:rm,equivalentFactor:factor,status,source:d.source};
 }
 function crossValidate(dataset){
@@ -93,7 +93,7 @@ function importSteady(text,meta){
  const csv=parseCSV(text);need(['qd_mlmin','clearance_water_mlmin'].every(h=>csv.header.includes(h)),'Required columns: qd_mlmin, clearance_water_mlmin.');
  if(csv.header.includes('qb_mlmin'))need(csv.rows.every(r=>Math.abs(r.qb_mlmin-meta.qb)<1e-8),'CSV Qb differs from the metadata. Split the datasets.');
  if(csv.header.includes('uf_net_mlmin'))need(csv.rows.every(r=>Math.abs(r.uf_net_mlmin)<1e-8),'This model supports zero net ultrafiltration only.');
- return validateDataset({...meta,paperCorrelation:false,rows:csv.rows.map(r=>[r.qd_mlmin,r.clearance_water_mlmin])});
+ return validateDataset({...meta,correlationModel:false,rows:csv.rows.map(r=>[r.qd_mlmin,r.clearance_water_mlmin])});
 }
 function membrane(p){
  ['thickness_um','Lp','mu','area','D','eps','tau'].forEach(k=>need(finite(p[k])&&p[k]>0,'Positive physical parameters are required.'));
@@ -128,6 +128,6 @@ function identifyStep(text){
  for(let i=split;i<r.length;i++)err+=(r[i].output-fitted[i])**2;
  return {...best,rmseTrain:Math.sqrt(best.sse/train.length),rmseHoldout:Math.sqrt(err/hold.length),split,rows:r,fitted,source:'Grid-based identification; final samples excluded from fitting; no confidence intervals.'};
 }
-const api={geometry,dappNodes,paperDapp,transportNodes,domain,paper,koaFromK,kFromKoa,interpolate,validateDataset,predict,crossValidate,parseCSV,importSteady,membrane,stepResponse,identifyStep};
+const api={geometry,dappNodes,effectiveDapp,transportNodes,domain,presets,koaFromK,kFromKoa,interpolate,validateDataset,predict,crossValidate,parseCSV,importSteady,membrane,stepResponse,identifyStep};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;root.DialyzerModel=api;
 })(typeof window!=='undefined'?window:globalThis);

@@ -1,41 +1,41 @@
 # Dialyzer Lab
 
-English-language static research application, version 0.2.0. Live site: https://apm1199.github.io/dialyzer-lab/ . Source: https://github.com/apm1199/dialyzer-lab . GitHub Pages serves `main` / `docs`.
+English-language static research application, version 0.2.1. Live site: https://apm1199.github.io/dialyzer-lab/ . Source: https://github.com/apm1199/dialyzer-lab . GitHub Pages serves `main` / `docs`.
 
 Open `docs/index.html` directly or serve `docs/` over HTTP. No installation, external services or analytics are required. CSV files are processed locally in the browser.
 
 ## What changed in 0.2
 
 - Entire website, validation messages and documentation are in English.
-- Both paper presets cover Qd = 0 to 133.33 mL/min, with explicit zero-flow handling.
-- The paper's full Dapp correlation now drives the reduced model, replacing the former four-point direct KoA interpolation for paper presets.
+- Both built-in presets cover Qd = 0 to 133.33 mL/min, with explicit zero-flow handling.
+- The built-in's full Dapp correlation now drives the reduced model, replacing the former four-point direct KoA interpolation for built-in presets.
 - Water adds the 17.5 mL/min clearance reference. The rounded 5 mL/min CFD result is a separate check, not a fitted point.
 - Blood below 41.67 mL/min is labelled as an unvalidated reduced-model prediction.
 - Imported datasets retain direct KoA interpolation within their positive measured range.
 
-## Source data and full paper correlation
+## Source data and full built-in correlation
 
-Source: user-supplied `Paper_APM - draft.pdf`, Sections 2.7 and 3.2, Table 4 and Appendix C. PDFs are not redistributed here.
+Model parameters and calibration datasets are informed by literature and numerical studies.
 
 | Qd (mL/min) | Dapp (m2/s) | Role |
 |---|---|---|
 | 0 | 0 | Imposed correlation boundary, not a measurement |
-| 5 | 7.866723070416e-12 | Paper correlation prediction |
+| 5 | 7.866723070416e-12 | built-in correlation prediction |
 | 17.5 | 4.326898176908e-11 | Identified node |
 | 41.67 | 1.8326875e-10 | Identified node |
 | 66.67 | 2.56355e-10 | Identified node |
-| 100 | 2.958149200032e-10 | Paper correlation prediction |
+| 100 | 2.958149200032e-10 | built-in correlation prediction |
 | 133.33 | 3.250668012693e-10 | Identified node |
 
-Use the five nodes at 0, 17.5, 41.67, 66.67 and 133.33 in a cubic Hermite interpolant. Derivatives follow shape-preserving PCHIP except for the final derivative, replaced by the final interval's secant slope, exactly as in Appendix C. The exponential continuation above 133.33 is not used in this application. No flow extrapolation beyond 133.33 is enabled.
+Use the five nodes at 0, 17.5, 41.67, 66.67 and 133.33 in a cubic Hermite interpolant. Derivatives follow shape-preserving PCHIP except for the final derivative, replaced by the final interval's secant slope, exactly as in the correlation specification. The exponential continuation above 133.33 is not used in this application. No flow extrapolation beyond 133.33 is enabled.
 
 The same Dapp is used for water and blood. Dapp is an effective calibrated transport coefficient, not an independently measured intrinsic membrane diffusivity. Dapp(0)=0 is phenomenological.
 
 ## Reduction to a rapid clearance model
 
-The site does not run the OpenFOAM solvers. It uses the paper correlation inside an equivalent countercurrent-exchanger model. This reduction has its own assumptions and must not inherit the original CFD validation automatically.
+The site does not run the OpenFOAM solvers. It uses the built-in correlation inside an equivalent countercurrent-exchanger model. This reduction has its own assumptions and must not inherit the original CFD validation automatically.
 
-Geometry constants from Appendix C:
+Geometry constants from the correlation specification:
 
     ri = 1.076024136551e-4 m
     ro = 1.576500479132e-4 m
@@ -60,7 +60,7 @@ Eta represents the combined effective response of unresolved fluid-side transfer
 | 100 | 78 | 71.01 |
 | 133.33 | 88 | 76.53 |
 
-Water 17, 41, 62 and 88 are identification targets; 78 is a comparison reference, not a manufacturer specification. Blood values are CFD predictions, not blood experiments. The water CFD result at 5 is only reported approximately as 4.66 in Section 3.2; the reduced model predicts about 4.596 without fitting this check. This roughly 1.4% model-to-model difference is not an experimental error estimate.
+Water 17, 41, 62 and 88 are identification targets; 78 is a comparison reference, not a manufacturer specification. Blood values are CFD predictions, not blood experiments. The water CFD result at 5 is only reported approximately as 4.66 in the numerical dataset; the reduced model predicts about 4.596 without fitting this check. This roughly 1.4% model-to-model difference is not an experimental error estimate.
 
 ## Exchanger equation
 
@@ -77,7 +77,7 @@ For Qd = 0, Kwater = 0, removal = 0, feed outlet concentration equals inlet conc
 
 ## Blood and concentration balances
 
-All presets have Qb = 100 mL/min and zero net UF. Water has fw = 1. Blood uses Hct = .35, plasma water .93, erythrocyte water .72, hence fw = .8565. Rapid urea equilibration between the two aqueous compartments is assumed. The paper's blood response uses Carreau-Yasuda rheology, but this application does not solve a viscosity/shear-rate field.
+All presets have Qb = 100 mL/min and zero net UF. Water has fw = 1. Blood uses Hct = .35, plasma water .93, erythrocyte water .72, hence fw = .8565. Rapid urea equilibration between the two aqueous compartments is assumed. The built-in's blood response uses Carreau-Yasuda rheology, but this application does not solve a viscosity/shear-rate field.
 
 The interface inlet concentration is kg/m3 of total feed fluid:
 
@@ -94,7 +94,7 @@ K in mL/min times C in kg/m3 gives the numerical removal rate in mg/min. Solute-
 
 Steady CSV: `qd_mlmin,clearance_water_mlmin`, with optional `qb_mlmin,uf_net_mlmin`. Supply at least two unique positive flows with 0 < K < min(Qw,Qd). Declare fluid, Qb and fw. Aggregate replicates before import; do not mix filters, solutes or operating conditions in one dataset. A comma delimiter with decimal points or a semicolon delimiter with decimal commas is supported. Text/quoted multiline fields are not supported.
 
-Imported data use direct PCHIP interpolation of the inverse exchanger KoA. They do not inherit the paper correlation or its 0–133.33 range. Nonzero net UF is rejected.
+Imported data use direct PCHIP interpolation of the inverse exchanger KoA. They do not inherit the built-in correlation or its 0–133.33 range. Nonzero net UF is rejected.
 
 Reference-node reconstruction is a fitting check, not validation. Interior leave-one-out checks remove one clearance reference and refit the equivalent mapping while retaining the already identified Dapp. Endpoints are not held out. This does not independently validate Dapp or establish parameter-transfer accuracy.
 
@@ -116,6 +116,6 @@ Geometry, Qb, fluid properties and net UF remain fixed per dataset. The applicat
 
 ## Development and tests
 
-Run `npm test`; no dependencies need installing. `docs/model.js` is the pure numerical engine; `docs/app.js` controls the interface. Tests cover the exact paper coefficients, physical bounds, conservation, zero flow, reference reconstruction, interpolation, CSV handling, full-domain monotonicity and synthetic dynamic identification. They are numerical checks, not experimental validation.
+Run `npm test`; no dependencies need installing. `docs/model.js` is the pure numerical engine; `docs/app.js` controls the interface. Tests cover the exact built-in coefficients, physical bounds, conservation, zero flow, reference reconstruction, interpolation, CSV handling, full-domain monotonicity and synthetic dynamic identification. They are numerical checks, not experimental validation.
 
 The MATLAB version should later implement the same equations and reference tests. The earlier uniform-UF MATLAB prototype is separate and does not power this site.
