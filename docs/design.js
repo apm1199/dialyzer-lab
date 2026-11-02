@@ -41,20 +41,28 @@ function hydraulics(p,fluid,qd,qb=p.feedFlow_mLmin){
  pd.forEach((v,i)=>pd[i]=v+offset);
  return {g,b,d,bw,q,jv,fwMid,mu,pb,pd,tmp,fw,nw,forward,back,net:q.reduce((a,v)=>a+v,0),axialReversal:d.some(v=>v<0)};
 }
+// Continue the unresolved reference resistance with a positive exponential tail.
+// Its value and slope match the last calibrated point; no other-filter clearance is used.
+function transportContinuation(qd){
+ const q0=133.33,dm=defaults.membraneDiffusivity*defaults.porosity/defaults.tortuosity*defaults.hindrance,d0=M.effectiveDapp(q0),r0=M.geometry.lc*(1/d0-1/dm);
+ if(qd<=q0){const d=M.effectiveDapp(qd);return {dapp:d,rAdd:qd===0?Infinity:M.geometry.lc*(1/d-1/dm),extrapolated:false};}
+ const slope=(d0-M.effectiveDapp(66.67))/(q0-66.67),rSlope=-M.geometry.lc*slope/(d0*d0),scale=-r0/rSlope,rAdd=r0*Math.exp(-(qd-q0)/scale),dapp=1/(1/dm+rAdd/M.geometry.lc);
+ return {dapp,rAdd,scale_mLmin:scale,extrapolated:true};
+}
 function solveScalar(p,fluid,qd,flow){
  const h=flow,g=h.g,N=p.cells,Cin=1; // Aqueous inlet concentration is normalised to one.
  const materialRef=defaults.membraneDiffusivity*defaults.porosity/defaults.tortuosity*defaults.hindrance;
- const dapp=M.effectiveDapp(qd),rAdd=M.geometry.lc*(1/dapp-1/materialRef),material=p.membraneDiffusivity*p.porosity/p.tortuosity*p.hindrance;
+ const continued=transportContinuation(qd),dapp=continued.dapp,rAdd=continued.rAdd,material=p.membraneDiffusivity*p.porosity/p.tortuosity*p.hindrance;
  const rm=g.lc/material+rAdd;need(rm>0&&Number.isFinite(rm),'Invalid membrane transport resistance.');
- const lower=[],upper=[],block=[],rhs=[],x=[],y=[];
+ const lower=[],upper=[],block=[],rhs=[],x=[],y=[],dbCells=h.fwMid.map(fw=>fluid==='water'?p.waterDiffusivity:fw*p.bloodDiffusivity);
  for(let i=0;i<N;i++){
-  const db=fluid==='water'?p.waterDiffusivity:h.fwMid[i]*p.bloodDiffusivity;
+  const db=dbCells[i];
   const kb=p.ShBlood*db/(2*g.ri),kd=p.ShDialysate*p.dialysateDiffusivity/(2*(g.rd-g.ro)),P=1/(1/kb+rm+1/kd),Pe=h.jv[i]/P,alpha=P*bernoulli(-Pe),beta=P*bernoulli(Pe);
   const fbL=h.bw[i],fbR=h.bw[i+1],fdL=-h.d[i],fdR=-h.d[i+1];
   // Upwind axial advection supports internal dialysate flow reversal.
-  const gb=db*g.ab/g.dx,gd=p.dialysateDiffusivity*g.ad/g.dx;
-  const lb=-Math.max(fbL,0)-(i?gb:0),ub=-Math.max(-fbR,0)-(i<N-1?gb:0),ld=-Math.max(fdL,0)-(i?gd:0),ud=-Math.max(-fdR,0)-(i<N-1?gd:0);
-  const a=Math.max(fbR,0)+Math.max(-fbL,0)+g.da*alpha+(i?gb:0)+(i<N-1?gb:0),b=-g.da*beta,c=-g.da*alpha,d=Math.max(fdR,0)+Math.max(-fdL,0)+g.da*beta+(i?gd:0)+(i<N-1?gd:0);
+  const gbL=(i?(db+dbCells[i-1])/2:db)*g.ab/g.dx,gbR=(i<N-1?(db+dbCells[i+1])/2:db)*g.ab/g.dx,gd=p.dialysateDiffusivity*g.ad/g.dx;
+  const lb=-Math.max(fbL,0)-(i?gbL:0),ub=-Math.max(-fbR,0)-(i<N-1?gbR:0),ld=-Math.max(fdL,0)-(i?gd:0),ud=-Math.max(-fdR,0)-(i<N-1?gd:0);
+  const a=Math.max(fbR,0)+Math.max(-fbL,0)+g.da*alpha+(i?gbL:0)+(i<N-1?gbR:0),b=-g.da*beta,c=-g.da*alpha,d=Math.max(fdR,0)+Math.max(-fdL,0)+g.da*beta+(i?gd:0)+(i<N-1?gd:0);
   lower.push([i?lb:0,i?ld:0]);upper.push([i<N-1?ub:0,i<N-1?ud:0]);block.push([a,b,c,d]);rhs.push([i===0?Math.max(fbL,0)*Cin:0,0]);
  }
  // Block Thomas elimination for a conservative, two-compartment balance.
@@ -75,13 +83,13 @@ const cache=new Map();
 function raw(p,fluid,qd){const flow=hydraulics(p,fluid,qd),solute=solveScalar(p,fluid,qd,flow);return {flow,solute};}
 function apparent(k,qw,qd){const cap=Math.min(qw,qd);return M.koaFromK(Math.max(cap*1e-12,Math.min(k,cap*(1-1e-10))),qw,qd);}
 function predict(input,fluid,qd,cBulk=.885){
- const p=validate(input);need(['water','blood'].includes(fluid),'Unknown feed fluid.');need(Number.isFinite(qd)&&qd>=0&&qd<=133.33,'Design flow domain: 0 to 133.33 mL/min.');need(cBulk>0&&Number.isFinite(cBulk),'A positive concentration is required.');
- const reference=M.predict(M.presets[fluid],qd,cBulk),fw=fluid==='water'?1:(1-p.hematocrit)*p.plasmaWater+p.hematocrit*p.rbcWater,qw=p.feedFlow_mLmin*fw;
+ const p=validate(input);need(['water','blood'].includes(fluid),'Unknown feed fluid.');need(Number.isFinite(qd)&&qd>=0,'Dialysate flow must be finite and nonnegative.');need(cBulk>0&&Number.isFinite(cBulk),'A positive concentration is required.');
+ const coefficientFlow=Math.min(qd,133.33),reference=M.predict(M.presets[fluid],coefficientFlow,cBulk),fw=fluid==='water'?1:(1-p.hematocrit)*p.plasmaWater+p.hematocrit*p.rbcWater,qw=p.feedFlow_mLmin*fw;
  if(qd===0)return {...reference,qb:p.feedFlow_mLmin,qw,cWaterIn:cBulk/fw,cWaterOut:cBulk/fw,design:p,hydraulics:null,materialDiffusivity:p.membraneDiffusivity*p.porosity/p.tortuosity*p.hindrance,hydraulicDarcy:geometry(p).k,status:'Zero-flow design limit',model:'Reference-normalised 1D design model'};
  const key=fluid+'|'+qd.toPrecision(12)+'|'+p.cells;let base=cache.get(key);if(!base){base=raw({...defaults,cells:p.cells},fluid,qd);if(cache.size>500)cache.clear();cache.set(key,base);}
- const current=raw(p,fluid,qd),baseKoa=apparent(base.solute.k,100*M.presets[fluid].fw,qd),newKoa=apparent(current.solute.k,qw,qd),ratio=newKoa/baseKoa,koa=reference.koa*ratio,k=M.kFromKoa(koa,qw,qd),cw=cBulk/fw;
+ const current=raw(p,fluid,qd),baseKoa=apparent(base.solute.k,100*M.presets[fluid].fw,qd),newKoa=apparent(current.solute.k,qw,qd),ratio=newKoa/baseKoa,tailFactor=qd>133.33?transportContinuation(qd).dapp/M.effectiveDapp(133.33):1,koa=reference.koa*tailFactor*ratio,k=M.kFromKoa(koa,qw,qd),cw=cBulk/fw;
  const h=current.flow,g=h.g;
- return {...reference,qb:p.feedFlow_mLmin,qw,koa,kWater:k,kBulk:k/fw,cWaterIn:cw,cWaterOut:cw*(1-k/qw),cBulkOut:cBulk*(1-k/qw),cDialysateOut:k*cw/qd,removal_mgmin:k*cw,equivalentFactor:null,dapp:g.lc/current.solute.rm,design:p,conductanceRatio:ratio,hydraulicDarcy:g.k,materialDiffusivity:current.solute.material,model:'Reference-normalised 1D design model',status:'Design exploration · unvalidated parameter transfer',hydraulics:{forward_mLmin:h.forward/F,back_mLmin:h.back/F,net_mLmin:h.net/F,bloodPressureDrop_mmHg:(h.pb[0]-h.pb.at(-1))/MMHG,dialysatePressureDrop_mmHg:(h.pd.at(-1)-h.pd[0])/MMHG,peakTMP_mmHg:Math.max(...h.tmp.map(Math.abs))/MMHG,axialReversal:h.axialReversal,fibers:g.nf,massBalanceRelative:current.solute.balance,x_m:Array.from({length:p.cells},(_,i)=>(i+.5)*g.dx),Jv_ms:h.jv,rawCb:current.solute.cb,rawCd:current.solute.cd,waterFraction:h.fwMid},rawReferenceClearance:base.solute.k,rawDesignClearance:current.solute.k};
+ return {...reference,qd,qb:p.feedFlow_mLmin,qw,koa,kWater:k,kBulk:k/fw,cWaterIn:cw,cWaterOut:cw*(1-k/qw),cBulkOut:cBulk*(1-k/qw),cDialysateOut:k*cw/qd,removal_mgmin:k*cw,equivalentFactor:null,dapp:g.lc/current.solute.rm,design:p,conductanceRatio:ratio,hydraulicDarcy:g.k,materialDiffusivity:current.solute.material,model:'Reference-normalised 1D design model',coefficientFlow_mLmin:coefficientFlow,extrapolated:qd>133.33,continuation:qd>133.33?transportContinuation(qd):null,status:qd>133.33?'Exploratory extrapolation · asymptotic decay of unresolved HF1000 resistance':'Design exploration · unvalidated parameter transfer',hydraulics:{forward_mLmin:h.forward/F,back_mLmin:h.back/F,net_mLmin:h.net/F,bloodPressureDrop_mmHg:(h.pb[0]-h.pb.at(-1))/MMHG,dialysatePressureDrop_mmHg:(h.pd.at(-1)-h.pd[0])/MMHG,peakTMP_mmHg:Math.max(...h.tmp.map(Math.abs))/MMHG,axialReversal:h.axialReversal,fibers:g.nf,massBalanceRelative:current.solute.balance,x_m:Array.from({length:p.cells},(_,i)=>(i+.5)*g.dx),Jv_ms:h.jv,rawCb:current.solute.cb,rawCd:current.solute.cd,waterFraction:h.fwMid},rawReferenceClearance:base.solute.k,rawDesignClearance:current.solute.k};
 }
-const api={defaults,validate,geometry,hydraulics,raw,predict};if(typeof module!=='undefined'&&module.exports)module.exports=api;root.DialyzerDesign=api;
+const api={defaults,validate,geometry,hydraulics,transportContinuation,raw,predict};if(typeof module!=='undefined'&&module.exports)module.exports=api;root.DialyzerDesign=api;
 })(typeof window!=='undefined'?window:globalThis);

@@ -23,3 +23,9 @@ Raw 1D clearances are inverted into equivalent KoA values. The ratio KoA_1D,new/
 The page has three sections: Clearance (including design controls), Your data, Model & method. No transient-model page is exposed because no transient measurements are available. Core legacy time-response utilities remain unused by the UI.
 
 Theme: Prussian blue (#003153), white typography. White Hematica complete logo supplied by the official website, https://www.hematica.it/wp-content/uploads/2025/11/LogoWhiteComplete-768x263.png. DISAT address: Corso Duca degli Abruzzi 24, 10129 Torino; campus entrance Corso Castelfidardo 39.
+
+## Extended flow inputs (0.5.0)
+
+Scope: pristine hollow-fibre membranes, urea, CVVHD, zero net UF. The design engine accepts finite nonnegative Qd and positive feed flow, subject to solver admissibility. Beyond Qd=133.33 mL/min, the unresolved HF1000 resistance decays exponentially to zero. The scale is −Radd/Radd' at the endpoint, so both value and slope match the existing correlation. Effective diffusivity approaches the reference material diffusivity; eta is held constant at its endpoint. Both 1D solves use actual Qd, and the conductance ratio transfers geometry/material/flow sensitivity. No clearance or KoA from another dialyzer enters a prediction. Manufacturer clearances are external checks only.
+
+The reference preset interpolation remains unchanged and rejects extrapolation. Extended conditions automatically enable the design model. Numeric flow input has no preset maximum; the slider starts at 1000 mL/min and expands if needed. Imported datasets retain measured-domain restrictions. This is an explicit continuation assumption, not universal predictive validity. Unknown membrane properties must remain labelled assumptions. Axial diffusion uses a shared face coefficient for both neighbouring cells, including changing aqueous fractions in blood, to conserve solute at high flow.
