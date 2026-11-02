@@ -1,7 +1,7 @@
 'use strict';
 const M=window.DialyzerModel,$=id=>document.getElementById(id);
 let custom=null,last=null,dynamicResult=null;
-const f=(x,n=2)=>Number(x).toLocaleString('it-IT',{minimumFractionDigits:n,maximumFractionDigits:n});
+const f=(x,n=2)=>Number(x).toLocaleString('en-GB',{minimumFractionDigits:n,maximumFractionDigits:n});
 function safe(fn){return (...args)=>{try{$('status').hidden=true;return fn(...args);}catch(e){$('status').textContent=e.message;$('status').hidden=false;}};}
 function download(name,content,type='text/plain'){const a=document.createElement('a'),u=URL.createObjectURL(new Blob([content],{type}));a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),500);}
 function dataset(){return custom||M.paper[$('fluid').value];}
@@ -12,7 +12,7 @@ function chart(target,series,points,{xLabel='Qd · mL/min',yLabel='Clearance · 
  if(xmax===xmin)xmax=xmin+1;if(ymax===ymin)ymax=ymin+1;const pad=(ymax-ymin)*.1;ymax+=pad;if(ymin<0)ymin-=pad;
  const sx=x=>l+(x-xmin)/(xmax-xmin)*(w-l-r),sy=y=>h-b-(y-ymin)/(ymax-ymin)*(h-t-b);
  const el=(tag,attrs,text)=>{const e=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const [k,v]of Object.entries(attrs))e.setAttribute(k,v);if(text!==undefined)e.textContent=text;return e;};
- const svg=el('svg',{viewBox:`0 0 ${w} ${h}`,role:'img','aria-label':`${yLabel} in funzione di ${xLabel}`});
+ const svg=el('svg',{viewBox:`0 0 ${w} ${h}`,role:'img','aria-label':`${yLabel} versus ${xLabel}`});
  for(let i=0;i<=4;i++){const y=ymin+(ymax-ymin)*i/4;svg.append(el('line',{x1:l,y1:sy(y),x2:w-r,y2:sy(y),stroke:'#e3e9e2'}));svg.append(el('text',{x:l-12,y:sy(y)+4,'text-anchor':'end'},f(y,1)));const x=xmin+(xmax-xmin)*i/4;svg.append(el('text',{x:sx(x),y:h-b+24,'text-anchor':'middle'},f(x,1)));}
  if(split!==null)svg.append(el('line',{x1:sx(split),x2:sx(split),y1:t,y2:h-b,stroke:'#b75b30','stroke-dasharray':'5 4'}));
  svg.append(el('path',{d:series.map((p,i)=>`${i?'L':'M'}${sx(p[0])},${sy(p[1])}`).join(' '),fill:'none',stroke:'#086655','stroke-width':2.7}));
@@ -21,31 +21,45 @@ function chart(target,series,points,{xLabel='Qd · mL/min',yLabel='Clearance · 
  $(target).classList.remove('placeholder');$(target).replaceChildren(svg);
 }
 function tableRows(id,rows){$(id).replaceChildren(...rows.map(values=>{const tr=document.createElement('tr');values.forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.append(td);});return tr;}));}
-function updateData(){const d=dataset();$('datasetName').textContent=d.name;tableRows('dataRows',d.rows.map(r=>{const p=M.predict(d,r[0]);return[f(r[0]),f(r[1]),f(p.kWater),f(p.koa,1)];}));const cv=M.crossValidate(d);$('cv').textContent=cv.rmse===null?'Almeno tre punti necessari per verificare un nodo interno.':`RMSE sui punti esclusi: ${f(cv.rmse,3)} mL/min. Verifica interna del dataset, non validazione indipendente.`;tableRows('cvRows',cv.points.map(p=>[f(p.qd),f(p.observed),f(p.predicted),f(p.error,3)]));}
+function updateData(){
+ const d=dataset();$('datasetName').textContent=d.name;
+ tableRows('dataRows',d.rows.map(r=>{const p=M.predict(d,r[0]);return[f(r[0]),f(r[1]),f(p.kWater),f(p.koa,1)];}));
+ const cv=M.crossValidate(d);$('cv').textContent=cv.rmse===null?'At least three points are needed to omit an interior node.':`Held-out RMSE: ${f(cv.rmse,3)} mL/min. An internal check of the reduction, not independent experimental validation.`;
+ tableRows('cvRows',cv.points.map(p=>[f(p.qd),f(p.observed),f(p.predicted),f(p.error,3)]));
+ $('lowCheck').hidden=!d.paperCorrelation;
+ if(d.paperCorrelation){
+  $('lowCheck').textContent=d.fluid==='water'?`Low-flow check, not fitted: at Qd = 5 mL/min the reduced model predicts ${f(M.predict(d,5).kWater,3)} mL/min; the paper reports approximately 4.66 mL/min in water CFD. The difference is ${f(100*(M.predict(d,5).kWater/4.66-1),2)}%. This compares models, not raw experiments.`:'No blood references below 41.67 mL/min are available here. That portion of the curve is a reduced-model prediction, not a validated blood result.';
+ }
+ const roles={0:'Imposed boundary',5:'Correlation prediction',17.5:'Identified coefficient',41.67:'Identified coefficient',66.67:'Identified coefficient',100:'Correlation prediction',133.33:'Identified coefficient'};
+ tableRows('correlationRows',[0,5,17.5,41.67,66.67,100,133.33].map(q=>[f(q),M.paperDapp(q).toExponential(6),roles[q]]));
+}
 function updateStatic(){
  const d=dataset(),qd=Number($('qd').value),cin=Number($('cin').value);last=M.predict(d,qd,cin);
  const set=(id,val)=>$(id).textContent=val;
- set('k',f(last.kWater));set('koa',f(last.koa,1));set('removal',f(last.removal_mgmin,2));set('cb',f(last.cBulkOut,4)+' kg/m³');set('cd',f(last.cDialysateOut,4)+' kg/m³');set('kbulk',f(last.kBulk)+' mL/min');set('qb',f(d.qb,2)+' mL/min');set('qw',f(last.qw,2)+' mL/min');
- set('sourceTag',custom?'DATI IMPORTATI':'RIFERIMENTI PAPER');
- set('sourceNote',custom?`${d.name}. Dati importati dall’utente; filtro e condizioni devono corrispondere alla campagna. Nessuna validazione indipendente implicita.`:d.fluid==='water'?'Tabella 4 del paper: riferimenti acquosi 41, 62 e 88 mL/min; a Qd = 100 il valore 78 è un riferimento di confronto. Non sono misure sperimentali grezze.':'Tabella 4 del paper: previsioni CFD con sangue, Hct 35%, fw = 0,8565, reologia Carreau–Yasuda. Non sono misure sperimentali sul sangue.');
- const x0=d.rows[0][0],x1=d.rows.at(-1)[0],curve=Array.from({length:101},(_,i)=>{const q=x0+(x1-x0)*i/100;return [q,M.predict(d,q).kWater];});chart('staticChart',curve,d.rows);updateData();
+ set('k',f(last.kWater));set('koa',f(last.koa,1));set('removal',f(last.removal_mgmin,2));set('cb',f(last.cBulkOut,4)+' kg/m³');set('cd',last.cDialysateOut===null?'N/A · no effluent':f(last.cDialysateOut,4)+' kg/m³');set('kbulk',f(last.kBulk)+' mL/min');set('qb',f(d.qb,2)+' mL/min');set('qw',f(last.qw,2)+' mL/min');
+ set('sourceTag',custom?'IMPORTED DATA':'PAPER CORRELATION');
+ set('dappValue',last.dapp===null?'N/A · imported model':last.dapp.toExponential(6)+' m²/s');set('factorValue',last.equivalentFactor===null?'N/A · direct K₀A interpolation':f(last.equivalentFactor,6));
+ set('predictionNotice',qd===0?'Zero-flow limit: no net steady solute removal. Dialysate effluent concentration is not defined.':custom?'Imported-data model: interpolation within the measured flow range.':d.fluid==='blood'&&qd<41.67?'Low-flow blood prediction: the paper Dapp is retained and the equivalent factor is continued below the available blood references. This region has not been validated against blood data.':d.fluid==='water'&&qd<17.5?'Low-flow water prediction: Dapp follows the paper; the equivalent factor is held at its first reference value. The rounded 5 mL/min CFD result is a separate reduction check.':'Paper-based reduced prediction: Dapp plus an identified equivalent factor. Geometry, feed flow and net UF are fixed to the reference configuration.');
+ set('sourceNote',custom?`${d.name}. User-imported data; the filter and conditions must match the experiment. No independent validation is implied.`:d.source);
+ const [x0,x1]=M.domain(d),curve=Array.from({length:201},(_,i)=>{const q=i===200?x1:x0+(x1-x0)*i/200;return[q,M.predict(d,q).kWater];});chart('staticChart',curve,d.rows);updateData();
 }
-function configure(){const d=dataset(),lo=d.rows[0][0],hi=d.rows.at(-1)[0];for(const id of ['qd','qdRange']){$(id).min=lo;$(id).max=hi;}let q=Number($('qd').value);if(!Number.isFinite(q))q=lo;q=Math.max(lo,Math.min(hi,q));$('qd').value=q;$('qdRange').value=q;$('minQ').textContent=f(lo);$('maxQ').textContent=f(hi);updateStatic();}
+function configure(){const d=dataset(),[lo,hi]=M.domain(d);for(const id of ['qd','qdRange']){$(id).min=lo;$(id).max=hi;}let q=Number($('qd').value);if(!Number.isFinite(q))q=lo;q=Math.max(lo,Math.min(hi,q));$('qd').value=q;$('qdRange').value=q;$('minQ').textContent=f(lo);$('maxQ').textContent=f(hi);document.querySelectorAll('[data-flow]').forEach(b=>b.disabled=Number(b.dataset.flow)<lo||Number(b.dataset.flow)>hi);updateStatic();}
 function membraneUpdate(){const p={thickness_um:Number($('thickness').value),Lp:Number($('lp').value),mu:Number($('mu').value),area:Number($('area').value),D:Number($('dbulk').value),eps:Number($('eps').value),tau:Number($('tortuosity').value)},r=M.membrane(p);$('darcy').textContent=r.darcy.toExponential(4)+' m²';$('deff').textContent=r.Deff.toExponential(4)+' m²/s';$('memKoa').textContent=f(r.membraneKoa,1)+' mL/min';}
 function showDynamic(text,label){
  const r=M.identifyStep(text);dynamicResult={...r,label};$('dynamicLabel').textContent=label;$('gain').textContent=f(r.gain,4);$('tau').textContent=f(r.tau,2)+' s';$('delay').textContent=f(r.delay,2)+' s';
- chart('dynamicChart',r.rows.map((v,i)=>[v.time_s,r.fitted[i]]),r.rows.map(v=>[v.time_s,v.output]),{xLabel:'Tempo · s',yLabel:'Uscita · unità del CSV',split:r.rows[r.split].time_s});
- $('fitStats').textContent=`RMSE stima: ${f(r.rmseTrain,5)} · RMSE parte esclusa: ${f(r.rmseHoldout,5)}. Linea tratteggiata: inizio della verifica.`;
- $('dynamicInfo').textContent=`Δy(t) = ${f(r.gain,4)} Δu [1 − exp(−(t − t₀ − ${f(r.delay,2)}) / ${f(r.tau,2)})] dopo il ritardo. Guadagno nelle unità output/input; τ e θ in secondi. Ricerca numerica a griglia, nessun intervallo di confidenza.`;
+ chart('dynamicChart',r.rows.map((v,i)=>[v.time_s,r.fitted[i]]),r.rows.map(v=>[v.time_s,v.output]),{xLabel:'Time · s',yLabel:'Output · CSV units',split:r.rows[r.split].time_s});
+ $('fitStats').textContent=`Fit RMSE: ${f(r.rmseTrain,5)} · Held-out RMSE: ${f(r.rmseHoldout,5)}. Dashed line: start of held-out samples.`;
+ $('dynamicInfo').textContent=`Δy(t) = ${f(r.gain,4)} Δu [1 − exp(−(t − t₀ − ${f(r.delay,2)}) / ${f(r.tau,2)})] after the delay. Gain uses output/input units; τ and θ are in seconds. Grid search; no confidence intervals.`;
 }
 for(const b of document.querySelectorAll('[data-tab]'))b.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(s=>s.hidden=s.id!==b.dataset.tab);document.querySelectorAll('[data-tab]').forEach(e=>{e.classList.toggle('active',e===b);e.removeAttribute('aria-current');});b.setAttribute('aria-current','page');});
+for(const button of document.querySelectorAll('[data-flow]'))button.addEventListener('click',safe(()=>{$('qd').value=button.dataset.flow;$('qdRange').value=button.dataset.flow;updateStatic();}));
 $('fluid').addEventListener('change',safe(()=>{custom=null;configure();}));
 $('qd').addEventListener('input',safe(()=>{$('qdRange').value=$('qd').value;updateStatic();}));$('qdRange').addEventListener('input',safe(()=>{$('qd').value=$('qdRange').value;updateStatic();}));$('cin').addEventListener('input',safe(updateStatic));
-$('export').addEventListener('click',safe(()=>{updateStatic();download('dialyzer-result.json',JSON.stringify({version:'0.1.0',created:new Date().toISOString(),model:'Apparent countercurrent exchanger, PCHIP KoA; steady CVVHD; zero net UF',dataset:dataset(),result:last,crossValidation:M.crossValidate(dataset()),dynamic:dynamicResult,limitations:['Fixed geometry, Qb, fluid and zero net UF per dataset','No local Jv prediction','No geometry sensitivity identified','No independent experimental validation']},null,2),'application/json');}));
+$('export').addEventListener('click',safe(()=>{updateStatic();download('dialyzer-result.json',JSON.stringify({version:'0.2.0',created:new Date().toISOString(),model:'Paper Dapp correlation + identified equivalent factor + countercurrent exchanger; imported data use direct KoA interpolation; CVVHD, zero net UF',dataset:dataset(),result:last,crossValidation:M.crossValidate(dataset()),dynamic:dynamicResult,limitations:['Fixed geometry, Qb, fluid and zero net UF per dataset','No local Jv prediction','No geometry sensitivity identified','Reduced-model validation is distinct from the paper CFD validation','Blood predictions below 41.67 mL/min are not validated','Equivalent factor is held constant below the first reference']},null,2),'application/json');}));
 $('template').addEventListener('click',()=>download('steady-template.csv','qd_mlmin,clearance_water_mlmin,qb_mlmin,uf_net_mlmin\n','text/csv'));
 $('restore').addEventListener('click',safe(()=>{custom=null;$('steadyFile').value='';configure();}));
 $('steadyFile').addEventListener('change',async()=>{try{if(!$('steadyFile').files.length)return;const file=$('steadyFile').files[0],fluid=$('importFluid').value;const candidate=M.importSteady(await file.text(),{name:$('importName').value.trim()||file.name,qb:Number($('importQb').value),fw:fluid==='water'?1:Number($('importFw').value),fluid,source:'User-imported CSV: '+file.name});custom=candidate;$('fluid').value=fluid;$('status').hidden=true;configure();}catch(e){$('status').textContent=e.message;$('status').hidden=false;}});
-$('dynamicFile').addEventListener('change',async()=>{try{if(!$('dynamicFile').files.length)return;const file=$('dynamicFile').files[0];showDynamic(await file.text(),'SERIE IMPORTATA · '+file.name);$('status').hidden=true;}catch(e){$('status').textContent=e.message;$('status').hidden=false;}});
-$('demo').addEventListener('click',safe(()=>{const t=Array.from({length:101},(_,i)=>i*2),params={y0:.2,gain:.6,du:1,tStep:20,tau:30,delay:6},y=M.stepResponse(t,params);showDynamic('time_s,input,output\n'+t.map((v,i)=>`${v},${v<20?1:2},${y[i]}`).join('\n'),'DEMO SINTETICA · NON SPERIMENTALE');}));
+$('dynamicFile').addEventListener('change',async()=>{try{if(!$('dynamicFile').files.length)return;const file=$('dynamicFile').files[0];showDynamic(await file.text(),'IMPORTED SERIES · '+file.name);$('status').hidden=true;}catch(e){$('status').textContent=e.message;$('status').hidden=false;}});
+$('demo').addEventListener('click',safe(()=>{const t=Array.from({length:101},(_,i)=>i*2),params={y0:.2,gain:.6,du:1,tStep:20,tau:30,delay:6},y=M.stepResponse(t,params);showDynamic('time_s,input,output\n'+t.map((v,i)=>`${v},${v<20?1:2},${y[i]}`).join('\n'),'SYNTHETIC DEMO · NOT EXPERIMENTAL');}));
 for(const id of ['thickness','lp','mu','area','eps','tortuosity','dbulk'])$(id).addEventListener('input',safe(membraneUpdate));
 safe(configure)();safe(membraneUpdate)();
