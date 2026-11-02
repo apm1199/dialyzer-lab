@@ -21,3 +21,5 @@ A retained reference resistance Radd=lc_ref(1/Dapp_ref−1/Deff_ref) accounts fo
 Raw 1D clearances are inverted into equivalent KoA values. The ratio KoA_1D,new/KoA_1D,ref scales the calibrated reference KoA before conversion to final clearance and global outlet concentrations. Identical reference properties reproduce the reference curve by construction. This is calibration preservation, not validation of new membrane geometries or operating conditions. Raw solver profiles in JSON are diagnostics and are not the final calibrated concentration profile.
 
 The page has three sections: Clearance (including design controls), Your data, Model & method. No transient-model page is exposed because no transient measurements are available. Core legacy time-response utilities remain unused by the UI.
+
+Theme: Prussian blue (#003153), white typography. White Hematica complete logo supplied by the official website, https://www.hematica.it/wp-content/uploads/2025/11/LogoWhiteComplete-768x263.png. DISAT address: Corso Duca degli Abruzzi 24, 10129 Torino; campus entrance Corso Castelfidardo 39.

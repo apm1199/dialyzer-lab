@@ -13,10 +13,10 @@ function chart(target,series,points,{xLabel='Qd · mL/min',yLabel='Clearance · 
  const sx=x=>l+(x-xmin)/(xmax-xmin)*(w-l-r),sy=y=>h-b-(y-ymin)/(ymax-ymin)*(h-t-b);
  const el=(tag,attrs,text)=>{const e=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const [k,v]of Object.entries(attrs))e.setAttribute(k,v);if(text!==undefined)e.textContent=text;return e;};
  const svg=el('svg',{viewBox:`0 0 ${w} ${h}`,role:'img','aria-label':`${yLabel} versus ${xLabel}`});
- for(let i=0;i<=4;i++){const y=ymin+(ymax-ymin)*i/4;svg.append(el('line',{x1:l,y1:sy(y),x2:w-r,y2:sy(y),stroke:'#e3e9e2'}));svg.append(el('text',{x:l-12,y:sy(y)+4,'text-anchor':'end'},f(y,1)));const x=xmin+(xmax-xmin)*i/4;svg.append(el('text',{x:sx(x),y:h-b+24,'text-anchor':'middle'},f(x,1)));}
- if(split!==null)svg.append(el('line',{x1:sx(split),x2:sx(split),y1:t,y2:h-b,stroke:'#b75b30','stroke-dasharray':'5 4'}));
- svg.append(el('path',{d:series.map((p,i)=>`${i?'L':'M'}${sx(p[0])},${sy(p[1])}`).join(' '),fill:'none',stroke:'#086655','stroke-width':2.7}));
- points.forEach(p=>svg.append(el('circle',{cx:sx(p[0]),cy:sy(p[1]),r:4,fill:'#b75b30',stroke:'white','stroke-width':1.5})));
+ for(let i=0;i<=4;i++){const y=ymin+(ymax-ymin)*i/4;svg.append(el('line',{x1:l,y1:sy(y),x2:w-r,y2:sy(y),stroke:'#4d7b98'}));svg.append(el('text',{x:l-12,y:sy(y)+4,'text-anchor':'end'},f(y,1)));const x=xmin+(xmax-xmin)*i/4;svg.append(el('text',{x:sx(x),y:h-b+24,'text-anchor':'middle'},f(x,1)));}
+ if(split!==null)svg.append(el('line',{x1:sx(split),x2:sx(split),y1:t,y2:h-b,stroke:'#8fc7ef','stroke-dasharray':'5 4'}));
+ svg.append(el('path',{d:series.map((p,i)=>`${i?'L':'M'}${sx(p[0])},${sy(p[1])}`).join(' '),fill:'none',stroke:'#fff','stroke-width':2.7}));
+ points.forEach(p=>svg.append(el('circle',{cx:sx(p[0]),cy:sy(p[1]),r:4,fill:'#fff',stroke:'#003153','stroke-width':1.5})));
  svg.append(el('text',{x:l,y:13},yLabel));svg.append(el('text',{x:(l+w-r)/2,y:h-6,'text-anchor':'middle'},xLabel));
  $(target).classList.remove('placeholder');$(target).replaceChildren(svg);
 }
