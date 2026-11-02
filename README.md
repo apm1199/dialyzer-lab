@@ -20,7 +20,7 @@ A retained reference resistance Radd=lc_ref(1/Dapp_ref−1/Deff_ref) accounts fo
 
 Raw 1D clearances are inverted into equivalent KoA values. The ratio KoA_1D,new/KoA_1D,ref scales the calibrated reference KoA before conversion to final clearance and global outlet concentrations. Identical reference properties reproduce the reference curve by construction. This is calibration preservation, not validation of new membrane geometries or operating conditions. Raw solver profiles in JSON are diagnostics and are not the final calibrated concentration profile.
 
-The page has three sections: Clearance (including design controls), Your data, Model & method. No transient-model page is exposed because no transient measurements are available. Core legacy time-response utilities remain unused by the UI.
+The interface has Clearance and Model & method. Standard mode has seven primary physical inputs plus fluid selection; Research mode exposes advanced properties and a read-only Reference checks section. The legacy CSV interpolation engine remains available in model.js, but the user interface no longer fits imported clearances. No transient-model page is exposed because no transient measurements are available. Core legacy time-response utilities remain unused by the UI.
 
 Theme: Prussian blue (#003153), white typography. White Hematica complete logo supplied by the official website, https://www.hematica.it/wp-content/uploads/2025/11/LogoWhiteComplete-768x263.png. DISAT address: Corso Duca degli Abruzzi 24, 10129 Torino; campus entrance Corso Castelfidardo 39.
 
@@ -33,3 +33,9 @@ The reference preset interpolation remains unchanged and rejects extrapolation. 
 ## Browser entry gate (0.6.0)
 
 The entry page checks a SHA-256 password fingerprint in the browser and opens the entire calculator after a matching password. The supplied password is not stored verbatim in source. Model scripts load only after entry; sessionStorage retains access for the current tab up to eight hours. Sign out clears the local session. This intentionally matches the thesis master-page interaction. It is a browser UI gate, not server-side authorization: GitHub source/history and directly addressed static assets remain public. It must not be represented as a private hosting boundary. Robots directives request no indexing but do not enforce access control.
+
+## Standard and Research interface (0.7.0)
+
+The numerical engines model.js and design.js are unchanged. Standard inputs are Qb, Qd, area, fibre length, inner diameter, thickness and Lp plus fluid. Research mode exposes the remaining material/fluid/film/rheology/grid parameters. Switching modes preserves values; retained advanced overrides are declared. Inactive fluid/rheology fields are hidden, while the unused hydraulic input is disabled. Kwater and Kbulk are displayed together. Concentration, removal and local diagnostics are secondary outputs.
+
+Manufacturer clearance is an optional post-prediction comparison in checks.js, with an explicit concentration basis and a user confirmation of matching conditions. It is never passed to the solver. The Validation subtab contains HF1000 calibration reconstruction and xevonta Hi18/Hi20/Hi23 manufacturer cross-checks at Qd=500 mL/min and Qb=200/300/400. Reference versus external cases, assumed properties and test-basis limitations are stated. No changes to the HF1000 calibration were made.

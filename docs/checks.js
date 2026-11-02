@@ -1,0 +1,8 @@
+/* External comparison targets are isolated from the transport model. */
+(function(root){'use strict';
+const filters={hi18:{name:'xevonta Hi 18',area:1.8,kuf:99,clearances:[198,281,341]},hi20:{name:'xevonta Hi 20',area:2,kuf:111,clearances:[199,287,349]},hi23:{name:'xevonta Hi 23',area:2.3,kuf:124,clearances:[199,290,354]}};
+function properties(key,qb){const f=filters[key];if(!f)throw Error('Unknown comparison filter.');return {area_m2:f.area,diameter_um:195,thickness_um:35,Lp:f.kuf/f.area,feedFlow_mLmin:qb};}
+function compare(result,observed,basis='aqueous',matched=false){if(!['aqueous','bulk'].includes(basis))throw Error('Select an aqueous or total-fluid concentration reference.');if(observed===null||observed===undefined||observed==='')return null;const value=Number(observed);if(!Number.isFinite(value)||value<=0)throw Error('Manufacturer clearance must be positive.');if(!result||!Number.isFinite(result.kWater)||!Number.isFinite(result.kBulk))return null;const predicted=basis==='aqueous'?result.kWater:result.kBulk;return {basis,observed:value,predicted,differencePct:100*(predicted-value)/value,conditionsConfirmed:!!matched,usedForPrediction:false};}
+function benchmark(D,key){const f=filters[key];return [200,300,400].map((qb,i)=>{const r=D.predict(properties(key,qb),'water',500);return {qb,qd:500,predicted:r.kWater,observed:f.clearances[i],differencePct:100*(r.kWater/f.clearances[i]-1)};});}
+const api={filters,properties,compare,benchmark};if(typeof module!=='undefined'&&module.exports)module.exports=api;root.DialyzerChecks=api;
+})(typeof window!=='undefined'?window:globalThis);
