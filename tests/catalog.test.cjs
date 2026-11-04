@@ -15,7 +15,7 @@ test('manufacturer clearance and error bands cannot change inputs or prediction'
 
 
 test('aqueous comparison eligibility preserves provenance and excludes nonzero UF',()=>{
- const eligible=C.filters.filter(f=>C.comparable(f).length);assert.equal(eligible.length,115);
+ const eligible=C.filters.filter(f=>C.comparable(f).length);assert.equal(eligible.length,117);
  for(const f of eligible){assert.ok(['water','saline'].includes(f.protocol.clearanceTestFluid));assert.ok(f.protocol.verifiedClearanceSource);assert.ok(C.comparable(f).every(b=>b.qf===0));}
  const base=C.find('baxter-prismaflex-st100');for(const fluid of ['blood','unknown'])assert.equal(C.comparable({...base,protocol:{...base.protocol,clearanceTestFluid:fluid}}).length,0);
  for(const qf of [undefined,1])assert.equal(C.comparable({...base,benchmarks:base.benchmarks.map(b=>({...b,qf}))}).length,0);
@@ -31,7 +31,7 @@ test('all eligible points stay visible, including three noncalculable fixed-modu
  const csv=require('node:fs').readFileSync(require('node:path').join(__dirname,'../docs/catalog-clearance-audit.csv'),'utf8');assert.equal(csv.split('"not-calculable"').length-1,10);assert.ok(csv.includes('"moduleDiameter_mm"'));
 });
 test('current selectors exclude requested manufacturers and retain pediatric and adult presets',()=>{
- assert.equal(C.filters.filter(C.applicable).length,182);
+ assert.equal(C.filters.filter(C.applicable).length,184);
  for(const f of C.filters)assert.equal(C.applicable(f),f.category!=='special'&&!['Medtronic','Nephros'].includes(f.manufacturer));
  for(const id of ['reference','b-braun-xevonta-hi-20','baxter-prismaflex-st100','fresenius-fx-paed','baxter-polyflux-2h'])assert.ok(C.applicable(C.find(id)),id);
 });

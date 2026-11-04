@@ -1,2 +1,5 @@
 node_modules/
 .DS_Store
+
+# Local regenerated audit is not automatically republished.
+reports/local-clearance-audit.csv

@@ -50,3 +50,8 @@ input:focus,select:focus,button:focus-visible{outline-color:var(--hematica-blue)
 
 /* Chart colours are set per SVG series and tolerance provenance. */
 .legend i{background:#fff}
+
+/* Audit state is conveyed by both colour and text in all filter selectors. */
+.auditPartial,select[data-audit-state="partial"]{color:#ffb454}.auditOutside,select[data-audit-state="outside"]{color:#ff8585}select[data-audit-state="unavailable"],select[data-audit-state="incomplete"]{color:#c0ced8}.filterStatusLegend{line-height:1.6}option[data-audit-state]{background:#003153}
+
+.transportMetrics{margin:1rem 0}.transportMetrics summary{cursor:pointer;font-weight:650}.transportMetrics .facts{margin-top:1rem}.transportMetrics .inputGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.8rem}
