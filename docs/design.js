@@ -3,17 +3,18 @@
 'use strict';
 const M=typeof module!=='undefined'&&module.exports?require('./model.js'):root.DialyzerModel;
 const F=1e-6/60,MMHG=133.322387415;
-const defaults={fiberCount:0,shellDiameter_mm:0,totalLength_mm:0,feedFlow_mLmin:100,hydraulicMode:'Lp',darcy_m2:3.343574515699709e-18,area_m2:M.geometry.area,length_mm:218,diameter_um:2*M.geometry.ri*1e6,thickness_um:(M.geometry.ro-M.geometry.ri)*1e6,packing:.5,porosity:.5205,tortuosity:Math.SQRT2,membraneDiffusivity:1.9e-9,hindrance:1,Lp:32,muPore:.00100299,muWater:.00100299,muBlood:.0035,rheology:'carreau',mu0:.0225,muInf:.0022,carreauTime:.11,carreauN:.392,carreauA:.644,hematocrit:.35,plasmaWater:.93,rbcWater:.72,waterDiffusivity:1.9e-9,bloodDiffusivity:7.4e-10,dialysateDiffusivity:1.9e-9,ShBlood:4.36,ShDialysate:3.66,cells:100};
+const defaults={fiberCount:0,shellDiameter_mm:0,totalLength_mm:0,feedFlow_mLmin:100,hydraulicMode:'Lp',hydraulicBasis:'planar',darcy_m2:3.343574515699709e-18,area_m2:M.geometry.area,length_mm:218,diameter_um:2*M.geometry.ri*1e6,thickness_um:(M.geometry.ro-M.geometry.ri)*1e6,packing:.5,porosity:.5205,tortuosity:Math.SQRT2,membraneDiffusivity:1.9e-9,hindrance:1,Lp:32,muPore:.00100299,muWater:.00100299,muBlood:.0035,rheology:'carreau',mu0:.0225,muInf:.0022,carreauTime:.11,carreauN:.392,carreauA:.644,hematocrit:.35,plasmaWater:.93,rbcWater:.72,waterDiffusivity:1.9e-9,bloodDiffusivity:7.4e-10,dialysateDiffusivity:1.9e-9,ShBlood:4.36,ShDialysate:3.66,cells:100};
 // Preserve the original calibration geometry; design exploration assumes a 40 mm module.
 const designDefaults={...defaults,shellDiameter_mm:40};
 function need(v,m){if(!v)throw Error(m);}
 function validate(input){
  const p={...defaults,...input};
  for(const k of Object.keys(input))need(k in defaults,'Unknown design property: '+k);
- for(const [k,v]of Object.entries(p))if(!['rheology','hydraulicMode'].includes(k))need(Number.isFinite(v),'A finite value is required: '+k);
+ for(const [k,v]of Object.entries(p))if(!['rheology','hydraulicMode','hydraulicBasis'].includes(k))need(Number.isFinite(v),'A finite value is required: '+k);
  for(const k of ['feedFlow_mLmin','area_m2','length_mm','diameter_um','thickness_um','tortuosity','membraneDiffusivity','hindrance','muPore','muWater','muBlood','mu0','muInf','carreauTime','carreauA','waterDiffusivity','bloodDiffusivity','dialysateDiffusivity','ShBlood','ShDialysate'])need(p[k]>0,'A positive value is required: '+k);
  for(const k of ['porosity','packing','plasmaWater','rbcWater','hindrance'])need(p[k]>0&&p[k]<=1,'Fraction outside (0,1]: '+k);
  need(p.packing<1,'Packing must be less than one.');need(p.Lp>=0&&p.darcy_m2>=0,'Hydraulic permeability must not be negative.');need(['Lp','darcy'].includes(p.hydraulicMode),'Unknown hydraulic input mode.');need(p.hematocrit>=0&&p.hematocrit<1,'Haematocrit must be a fraction in [0,1).');need(p.carreauN>0&&p.carreauN<=1,'Carreau n must lie in (0,1].');need(p.mu0>=p.muInf,'Zero-shear viscosity must be at least the high-shear value.');
+ need(['planar','inner-area'].includes(p.hydraulicBasis),'Unknown hydraulic permeance basis.');
  need(p.fiberCount>=0&&Number.isInteger(p.fiberCount),'Fibre count must be an integer, or 0 to derive it from area.');
  need(p.shellDiameter_mm>=0,'Module internal diameter must not be negative.');
  need(p.totalLength_mm>=0,'Total module length must not be negative.');if(p.totalLength_mm>0)need(p.length_mm<p.totalLength_mm,'Active fibre length must be shorter than the total module length; total length includes the headers.');
@@ -28,7 +29,7 @@ function geometry(p){
  const ri=p.diameter_um*1e-6/2,ro=ri+p.thickness_um*1e-6,L=p.length_mm/1000;
  const nf=p.fiberCount>0?p.fiberCount:p.area_m2/(2*Math.PI*ri*L),area=2*Math.PI*ri*L*nf;
  const shellRadius=p.shellDiameter_mm>0?p.shellDiameter_mm/2000:ro*Math.sqrt(nf/p.packing),rd=shellRadius/Math.sqrt(nf),packing=ro*ro/(rd*rd),lc=ri*Math.log(ro/ri);
- const lp=p.Lp*1e-6/3600/MMHG,k=p.hydraulicMode==='darcy'?p.darcy_m2:lp*p.muPore*(ro-ri),lpCyl=k/(p.muPore*lc);
+ const lp=p.Lp*1e-6/3600/MMHG,k=p.hydraulicMode==='darcy'?p.darcy_m2:lp*p.muPore*(p.hydraulicBasis==='inner-area'?lc:ro-ri),lpCyl=k/(p.muPore*lc);
  return {ri,ro,L,nf,area,rd,shellRadius,packing,lc,lp,k,lpCyl,dx:L/p.cells,da:area/p.cells,ab:nf*Math.PI*ri**2,ad:nf*Math.PI*(rd*rd-ro*ro)};
 }
 function hydraulics(p,fluid,qd,qb=p.feedFlow_mLmin){
