@@ -92,3 +92,10 @@ All three filter selectors show orange for partial disagreement and red for tota
 The expandable urea transport panel reports final equivalent K0A, NTU, effectiveness, extraction ratio and capacity ratio. The signed local Pe profile uses the already-computed Jv and film-plus-membrane permeability of each cell before reference normalisation. The convective urea sieving factor remains an assumption of1. The optional manufacturer K0A comparison requires matched inlet/dialysate flow, aqueous fluid and zero UF; comparison values cannot enter prediction. Diagnostics and comparison conditions are included in JSON exports. Versioned entry assets are updated so the loader requests the new modules.
 
 The website CSV download remains the explicitly labelled v0.9.3 archive. A regenerated full audit is written to ignored reports/local-clearance-audit.csv and is not automatically republished. Current selector flags and global counts include the new publicly sourced HF presets.
+
+
+## Geometry provenance (0.9.7)
+
+Preset values, reference assumptions, derived fibre counts and edited inputs are shown separately. Total module length is only an upper bound on active fibre length; it never replaces it in the transport equations. HCD015/HCD025 remain selectable but require active fibre length before prediction. The 40 mm internal module diameter remains a project assumption. Agreement with clearance observations does not verify geometry.
+
+Supported blood/dialysate hollow-fibre presets remain available independently of brand. Comparison eligibility uses individual observations explicitly reported at zero net UF, treated as water under the project convention; original source medium descriptions remain in details. Unknown/nonzero UF observations do not enter comparisons. The downloadable CSV is a historical archive, not the current geometry audit.

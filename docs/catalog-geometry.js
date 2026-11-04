@@ -1,0 +1,23 @@
+/* Geometry provenance and physical bounds; observations never set geometry. */
+(function(root){'use strict';
+const C=typeof module!=='undefined'&&module.exports?require('./catalog-design.js'):root.DialyzerCatalog;
+const totalLengths={'medtronic-hcd-015':128,'medtronic-hcd-025':140,'medtronic-clearum-hs-13':306,'medtronic-clearum-hs-15':306,'medtronic-clearum-hs-17':306,'medtronic-clearum-hs-20':366,'medtronic-clearum-hs-22':366};
+const missingActiveLength=new Set(['medtronic-hcd-015','medtronic-hcd-025']);
+const theralite=C.find('baxter-theralite');if(theralite)theralite.modelRole='hollow-fibre-dialyzer';
+function applicable(f){return !!f&&(f.category!=='special'||f.modelRole==='hollow-fibre-dialyzer');}
+function properties(D,id,qb){const f=C.find(id);if(!applicable(f))throw Error('Not a supported blood/dialysate hollow-fibre urea device.');const p={...D.designDefaults};for(const [k,v]of Object.entries(f.properties))if(k in p)p[k]=v;if(qb!==undefined)p.feedFlow_mLmin=qb;if(totalLengths[id])p.totalLength_mm=totalLengths[id];if(missingActiveLength.has(id)&&!f.properties.length_mm)p.length_mm=0;return p;}
+function comparable(f){return applicable(f)?f.benchmarks.filter(b=>b.qf===0):[];}
+function exclusionReasons(f){const out=[];if(!applicable(f))out.push('Not a blood/dialysate urea dialyzer');if(!f.benchmarks.some(b=>b.qf===0))out.push('No explicitly documented zero-net-UF urea point');return out;}
+function profile(D,id,p){
+ const f=C.find(id),reference=id==='reference',custom=!f,rows=[],missing=[];
+ const specs=[['area_m2','Membrane area','m²'],['length_mm','Active fibre length','mm'],['diameter_um','Fibre inner diameter','µm'],['thickness_um','Membrane thickness','µm']];
+ for(const [key,label,unit]of specs){let state=custom?'user-defined':reference?'reference model':key in f.properties?'catalog value':'reference assumption';if(key==='length_mm'&&(!Number.isFinite(p[key])||p[key]<=0))state='required / not supplied';if(!custom&&!reference&&!(key in f.properties)){missing.push(key);if(p[key]!==D.designDefaults[key]&&p[key]>0)state='user override of unreported value';}if(!custom&&!reference&&key in f.properties&&Math.abs(p[key]-f.properties[key])>1e-8)state='modified input';if(key==='area_m2'&&p.fiberCount>0)state='derived from count, bore and active length';rows.push({key,label,unit,value:key==='area_m2'&&p.fiberCount>0?p.fiberCount*Math.PI*p.diameter_um*1e-6*p.length_mm/1000:Number.isFinite(p[key])&&p[key]>0?p[key]:null,state});}
+ const nf=p.fiberCount>0?p.fiberCount:p.length_mm>0&&p.diameter_um>0?p.area_m2/(Math.PI*p.diameter_um*1e-6*p.length_mm/1000):null;
+ rows.push({key:'fiberCount',label:'Number of fibres',unit:'',value:nf,state:p.fiberCount>0?(f?.properties.fiberCount?'reported technical-source count':'user-specified'):'derived; inherits input assumptions'});
+ rows.push({key:'shellDiameter_mm',label:'Internal module diameter',unit:'mm',value:p.shellDiameter_mm,state:p.shellDiameter_mm>0?(f&&'shellDiameter_mm'in f.properties?'catalog value':'project assumption / user input'):'derived from prescribed packing'});
+ rows.push({key:'totalLength_mm',label:'Total module length (not active fibre length)',unit:'mm',value:p.totalLength_mm||null,state:totalLengths[id]&&p.totalLength_mm===totalLengths[id]?'reported total length; upper bound only':p.totalLength_mm>0?'user-specified upper bound':'not supplied'});
+ return {filterId:id,rows,missingCore:missing,missingActive:rows.find(r=>r.key==='length_mm').value===null,source:reference?'Implemented reference-model geometry':f?.source?.file||'User-defined geometry',moduleDiameterAssumed:!f?.properties?.shellDiameter_mm,warning:missing.length?'Unreported fibre geometry is using reference assumptions. Predicted agreement does not verify those assumptions.':'Fibre geometry is specified; check the source and module-side assumptions.'};
+}
+function assumptions(f){const a=C.assumptions(f).filter(k=>k!=='packing'||f.properties.shellDiameter_mm===0);return [...new Set(a)];}
+const api={...C,applicable,properties,comparable,exclusionReasons,geometryProfile:profile,assumptions};if(typeof module!=='undefined'&&module.exports)module.exports=api;root.DialyzerCatalog=api;
+})(typeof window!=='undefined'?window:globalThis);

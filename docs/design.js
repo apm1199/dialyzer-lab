@@ -3,7 +3,7 @@
 'use strict';
 const M=typeof module!=='undefined'&&module.exports?require('./model.js'):root.DialyzerModel;
 const F=1e-6/60,MMHG=133.322387415;
-const defaults={fiberCount:0,shellDiameter_mm:0,feedFlow_mLmin:100,hydraulicMode:'Lp',darcy_m2:3.343574515699709e-18,area_m2:M.geometry.area,length_mm:218,diameter_um:2*M.geometry.ri*1e6,thickness_um:(M.geometry.ro-M.geometry.ri)*1e6,packing:.5,porosity:.5205,tortuosity:Math.SQRT2,membraneDiffusivity:1.9e-9,hindrance:1,Lp:32,muPore:.00100299,muWater:.00100299,muBlood:.0035,rheology:'carreau',mu0:.0225,muInf:.0022,carreauTime:.11,carreauN:.392,carreauA:.644,hematocrit:.35,plasmaWater:.93,rbcWater:.72,waterDiffusivity:1.9e-9,bloodDiffusivity:7.4e-10,dialysateDiffusivity:1.9e-9,ShBlood:4.36,ShDialysate:3.66,cells:100};
+const defaults={fiberCount:0,shellDiameter_mm:0,totalLength_mm:0,feedFlow_mLmin:100,hydraulicMode:'Lp',darcy_m2:3.343574515699709e-18,area_m2:M.geometry.area,length_mm:218,diameter_um:2*M.geometry.ri*1e6,thickness_um:(M.geometry.ro-M.geometry.ri)*1e6,packing:.5,porosity:.5205,tortuosity:Math.SQRT2,membraneDiffusivity:1.9e-9,hindrance:1,Lp:32,muPore:.00100299,muWater:.00100299,muBlood:.0035,rheology:'carreau',mu0:.0225,muInf:.0022,carreauTime:.11,carreauN:.392,carreauA:.644,hematocrit:.35,plasmaWater:.93,rbcWater:.72,waterDiffusivity:1.9e-9,bloodDiffusivity:7.4e-10,dialysateDiffusivity:1.9e-9,ShBlood:4.36,ShDialysate:3.66,cells:100};
 // Preserve the original calibration geometry; design exploration assumes a 40 mm module.
 const designDefaults={...defaults,shellDiameter_mm:40};
 function need(v,m){if(!v)throw Error(m);}
@@ -16,6 +16,7 @@ function validate(input){
  need(p.packing<1,'Packing must be less than one.');need(p.Lp>=0&&p.darcy_m2>=0,'Hydraulic permeability must not be negative.');need(['Lp','darcy'].includes(p.hydraulicMode),'Unknown hydraulic input mode.');need(p.hematocrit>=0&&p.hematocrit<1,'Haematocrit must be a fraction in [0,1).');need(p.carreauN>0&&p.carreauN<=1,'Carreau n must lie in (0,1].');need(p.mu0>=p.muInf,'Zero-shear viscosity must be at least the high-shear value.');
  need(p.fiberCount>=0&&Number.isInteger(p.fiberCount),'Fibre count must be an integer, or 0 to derive it from area.');
  need(p.shellDiameter_mm>=0,'Module internal diameter must not be negative.');
+ need(p.totalLength_mm>=0,'Total module length must not be negative.');if(p.totalLength_mm>0)need(p.length_mm<p.totalLength_mm,'Active fibre length must be shorter than the total module length; total length includes the headers.');
  if(p.shellDiameter_mm>0)need(geometry(p).rd>geometry(p).ro,'Module internal diameter is too small for this fibre bundle.');
  need(p.cells>=20&&p.cells<=400&&Number.isInteger(p.cells),'Use 20 to 400 axial cells.');need(['newtonian','carreau'].includes(p.rheology),'Unknown rheology.');
  return p;
@@ -105,4 +106,5 @@ function predict(input,fluid,qd,cBulk=.885){
 }
 const api={defaults,designDefaults,validate,geometry,hydraulics,transportContinuation,raw,predict};if(typeof module!=='undefined'&&module.exports)module.exports=api;root.DialyzerDesign=api;
 })(typeof window!=='undefined'?window:globalThis);
+
 
