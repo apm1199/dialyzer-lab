@@ -1,6 +1,6 @@
 # Dialyzer Lab
 
-English static research app for the Baxter Prismaflex HF1000 urea reference response and reference-normalised membrane design exploration. Published from `docs/` with GitHub Pages. Developed by Antonio Pio Mantovan; experimental validation activities in collaboration with Hematica. Logo is the unchanged symbol supplied by the user. Public contacts are included in the page footer.
+English static research app for urea clearance and pristine-membrane design exploration. Developed from experimental data collected by Hematica during in-vitro CVVHD experiments. The reference test module is Baxter Prismaflex HF1000. Published from `docs/` with GitHub Pages. Developed by Antonio Pio Mantovan; experimental validation activities in collaboration with Hematica. Logo is the unchanged symbol supplied by the user. Public contacts are included in the page footer.
 
 ## Run and verify
 
@@ -14,7 +14,7 @@ Serve `docs/` with any static server. No build dependencies. Run `node --test te
 
 `docs/design.js` solves approximate steady 1D coupled hydraulics and conservative solute transport with 100 axial cells. Geometry sets inner area, cylindrical membrane length, equivalent fibre count and dialysate annulus. Material diffusion uses Dbulk × porosity × hindrance / tortuosity. Intrinsic permeability is either supplied or derived from Lp × pore viscosity × thickness (all converted to SI). Cylindrical Darcy flow and Poiseuille pressure losses generate local filtration/backfiltration with equal feed inlet/outlet flow, hence zero net UF.
 
-Blood uses a constant viscosity or a nominal-wall-shear Carreau–Yasuda approximation. Default constants: mu0=0.0225 Pa s, muInf=0.0022 Pa s, lambda=0.11 s, n=0.392, a=0.644; Hct=0.35 and plasma/RBC water fractions 0.93/0.72. These are model assumptions, not new fitted measurements. Film Sherwood defaults are 3.66; the annular and blood closures are simplified and adjustable.
+Blood uses a constant viscosity or a nominal-wall-shear Carreau–Yasuda approximation. Default constants: mu0=0.0225 Pa s, muInf=0.0022 Pa s, lambda=0.11 s, n=0.392, a=0.644; Hct=0.35 and plasma/RBC water fractions 0.93/0.72. These are model assumptions, not new fitted measurements. Film Sherwood defaults are 4.36 (feed) and 3.66 (dialysate); the annular and blood closures are simplified and adjustable.
 
 A retained reference resistance Radd=lc_ref(1/Dapp_ref−1/Deff_ref) accounts for unresolved effective transport. Membrane resistance becomes lc_new/Deff_new+Radd; fluid film resistances are added in series. The integrated convection–diffusion flux uses the stable Bernoulli function B(z)=z/expm1(z), with freely sieved urea. Axial finite-volume balances include upwind advection and molecular diffusion, including internal dialysate reversal. Adsorption, fouling and oncotic pressure are omitted.
 
@@ -41,3 +41,17 @@ The numerical engines model.js and design.js are unchanged. Standard inputs are 
 Manufacturer clearance is an optional post-prediction comparison in checks.js, with an explicit concentration basis and a user confirmation of matching conditions. It is never passed to the solver. The Validation subtab contains HF1000 calibration reconstruction and xevonta Hi18/Hi20/Hi23 manufacturer cross-checks at Qd=500 mL/min and Qb=200/300/400. Reference versus external cases, assumed properties and test-basis limitations are stated. No changes to the HF1000 calibration were made.
 
 Version 0.7.1 labels water/blood inlet flow explicitly in Standard mode. Detailed membrane/module and film inputs remain editable in Research mode. Feed-side Sherwood is 4.36 and dialysate-side Sherwood 3.66. The HF1000 calibration data are unchanged; the reference-normalised 1D denominator uses the updated default feed closure. See the membrane and Sherwood audit for verification.
+
+## Filter catalog, geometry and comparison figures (0.8.0)
+
+`docs/catalog.js` holds 207 sourced device entries (189 selectable blood dialyzers and 18 unsupported special devices) extracted from the supplied manufacturer archive and compiled workbook. Application groups distinguish acute AKI/CRRT from chronic intermittent HD; the solver itself remains zero-net-UF CVVHD for every preset. Selecting a preset resets material/numerical assumptions to reference values and preserves inlet feed and dialysate flow and the selected fluid. Missing active fibre length is never replaced by housing length. Source filenames, pages and missing-property assumptions are displayed and exported. Lp derived from KUF/area is a device test coefficient, often measured using blood, and is not automatically an intrinsic pristine-water permeability.
+
+Standard mode permits an explicit integer fibre count. Zero means derive count from area. With a specified count, the effective inner area is Nf*pi*di*L; the area field is computed. In Research mode, a positive internal module diameter sets rd=Rshell/sqrt(Nf), with packing inferred. At zero diameter, packing sets Rshell=ro*sqrt(Nf/packing); count alone does not determine annular spacing. All hydraulics and cell exchange areas use the consistent derived area.
+
+Gross filtration fraction is sum(max(Jv_i*A_i,0))/Qb,in, using total blood/water inlet flow rather than plasma-water flow. It is displayed in percent alongside aqueous clearance; Kbulk remains under secondary results. Both clearance and gross fraction can be plotted against Qd. At Qd=0 the existing hydraulic solve is bypassed, so FF is unavailable rather than fabricated as zero.
+
+Validation offers manufacturer comparison points at each documented Qd. Explicit nonzero-UF benchmark points are retained as provenance in the catalog but excluded from this zero-UF comparison. Missing QF is disclosed. White whiskers use documented manufacturer tolerances; red whiskers use a user-requested assumed +/-10% comparison band where none is supplied. None are statistical confidence intervals. Clearances and bounds never enter predicted filter properties or the solver.
+
+Prediction and Validation figures can be downloaded as a standalone SVG or 2100x1410 PNG. Exports include filter identity, operating conditions, predicted curve, nominal manufacturer points, error bars and the distinction between assumed bands and reported tolerances. There are no chart-library, network or backend dependencies for image export.
+
+The primary response chart uses a dashed marker at the currently selected Qd, rather than at the calibration endpoint. Its annotation and both image exports update with the selected dialysate flow. All public calibration attribution identifies Hematica in-vitro CVVHD experiments. HF1000 is retained only as a test module/filter identity, not as the supplier of calibration data.

@@ -5,7 +5,7 @@ const FLOW=1e-6/60;
 const geometry={ri:1.076024136551e-4,ro:1.576500479132e-4,length:.218,fibers:7500,lc:4.109708596949e-5};
 geometry.area=2*Math.PI*geometry.ri*geometry.length*geometry.fibers;
 const dappNodes={x:[0,17.5,41.67,66.67,133.33],y:[0,4.326898176908e-11,1.8326875e-10,2.56355e-10,3.250668012693e-10]};
-const presets={water:{name:'Water · default transport model',qb:100,fw:1,fluid:'water',correlationModel:true,source:'Model informed by literature and numerical datasets.',rows:[[17.5,17],[41.67,41],[66.67,62],[100,78],[133.33,88]],checks:[[5,4.66]]},blood:{name:'Blood · default transport model',qb:100,fw:.8565,fluid:'blood',correlationModel:true,source:'Model informed by literature and numerical datasets.',rows:[[41.67,40.47],[66.67,58.71],[100,71.01],[133.33,76.53]],checks:[]}};
+const presets={water:{name:'Water · default transport model',qb:100,fw:1,fluid:'water',correlationModel:true,source:'Calibration data provided by Hematica from in-vitro CVVHD experiments.',rows:[[17.5,17],[41.67,41],[66.67,62],[100,78],[133.33,88]],checks:[[5,4.66]]},blood:{name:'Blood · default transport model',qb:100,fw:.8565,fluid:'blood',correlationModel:true,source:'Numerical blood response derived from the model calibrated using Hematica in-vitro CVVHD data.',rows:[[41.67,40.47],[66.67,58.71],[100,71.01],[133.33,76.53]],checks:[]}};
 function need(v,msg){if(!v)throw Error(msg);}
 function finite(x){return Number.isFinite(x);}
 function koaFromK(k,qw,qd){

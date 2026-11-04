@@ -1,1 +1,1 @@
-{"name":"dialyzer-lab","version":"0.7.1","private":true,"scripts":{"test":"node --test tests/*.cjs"}}
+{"name":"dialyzer-lab","version":"0.8.0","private":true,"scripts":{"test":"node --test tests/*.cjs"}}
