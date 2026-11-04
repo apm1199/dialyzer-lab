@@ -4,6 +4,8 @@
 const M=typeof module!=='undefined'&&module.exports?require('./model.js'):root.DialyzerModel;
 const F=1e-6/60,MMHG=133.322387415;
 const defaults={fiberCount:0,shellDiameter_mm:0,feedFlow_mLmin:100,hydraulicMode:'Lp',darcy_m2:3.343574515699709e-18,area_m2:M.geometry.area,length_mm:218,diameter_um:2*M.geometry.ri*1e6,thickness_um:(M.geometry.ro-M.geometry.ri)*1e6,packing:.5,porosity:.5205,tortuosity:Math.SQRT2,membraneDiffusivity:1.9e-9,hindrance:1,Lp:32,muPore:.00100299,muWater:.00100299,muBlood:.0035,rheology:'carreau',mu0:.0225,muInf:.0022,carreauTime:.11,carreauN:.392,carreauA:.644,hematocrit:.35,plasmaWater:.93,rbcWater:.72,waterDiffusivity:1.9e-9,bloodDiffusivity:7.4e-10,dialysateDiffusivity:1.9e-9,ShBlood:4.36,ShDialysate:3.66,cells:100};
+// Preserve the original calibration geometry; design exploration assumes a 40 mm module.
+const designDefaults={...defaults,shellDiameter_mm:40};
 function need(v,m){if(!v)throw Error(m);}
 function validate(input){
  const p={...defaults,...input};
@@ -100,5 +102,6 @@ function predict(input,fluid,qd,cBulk=.885){
  const h=current.flow,g=h.g;
  return {...reference,qd,qb:p.feedFlow_mLmin,qw,koa,kWater:k,kBulk:k/fw,cWaterIn:cw,cWaterOut:cw*(1-k/qw),cBulkOut:cBulk*(1-k/qw),cDialysateOut:k*cw/qd,removal_mgmin:k*cw,equivalentFactor:null,dapp:g.lc/current.solute.rm,design:p,conductanceRatio:ratio,hydraulicDarcy:g.k,materialDiffusivity:current.solute.material,model:'Reference-normalised 1D design model',coefficientFlow_mLmin:coefficientFlow,extrapolated:qd>133.33,continuation:qd>133.33?transportContinuation(qd):null,status:qd>133.33?'Exploratory extrapolation · asymptotic decay of unresolved reference resistance':'Design exploration · unvalidated parameter transfer',filtrationFraction:h.forward/(p.feedFlow_mLmin*F),filtrationFractionPct:100*h.forward/(p.feedFlow_mLmin*F),hydraulics:{forward_mLmin:h.forward/F,back_mLmin:h.back/F,net_mLmin:h.net/F,bloodPressureDrop_mmHg:(h.pb[0]-h.pb.at(-1))/MMHG,dialysatePressureDrop_mmHg:(h.pd.at(-1)-h.pd[0])/MMHG,peakTMP_mmHg:Math.max(...h.tmp.map(Math.abs))/MMHG,axialReversal:h.axialReversal,fibers:g.nf,massBalanceRelative:current.solute.balance,x_m:Array.from({length:p.cells},(_,i)=>(i+.5)*g.dx),Jv_ms:h.jv,rawCb:current.solute.cb,rawCd:current.solute.cd,waterFraction:h.fwMid},rawReferenceClearance:base.solute.k,rawDesignClearance:current.solute.k};
 }
-const api={defaults,validate,geometry,hydraulics,transportContinuation,raw,predict};if(typeof module!=='undefined'&&module.exports)module.exports=api;root.DialyzerDesign=api;
+const api={defaults,designDefaults,validate,geometry,hydraulics,transportContinuation,raw,predict};if(typeof module!=='undefined'&&module.exports)module.exports=api;root.DialyzerDesign=api;
 })(typeof window!=='undefined'?window:globalThis);
+
