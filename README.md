@@ -67,3 +67,10 @@ Only the 17 documented CVVHD presets are selectable; other entries remain catalo
 Standard mode displays fibre count immediately. Estimates are labelled calculated, with assumed active length disclosed. A checkbox enables a measured/specified count and recomputes area consistently. The supplied workbook has Number of fibers headers but empty B.Braun/Baxter data cells. A separate reported-count table documents HF1000=7500/HF1400=9500 from Clark, Membranes for CRRT p.15 (data attributed to Baxter), and xevonta Hi18=11000 from Poorkhalil et al., DOI 10.1111/aor.13355, Table1. These are not relabelled as manufacturer datasheets or generalized to other variants. The Hi18 count is retained as literature information, not forced into geometry without confirming active length and nominal area consistency.
 
 The main graph compares two model predictions under shared flow, fluid, film and numerical settings. A uses edited inputs; B retains its physical membrane preset and assumptions. White denotes A, red B. The adaptive Qd marker, both curves and identity labels are included in image exports; B inputs/results are included in JSON. Manufacturer clearance never enters this calculation.
+
+
+## Availability correction (0.9.1)
+
+Commercial HD/CRRT indications no longer disable physical presets. All189 blood-dialyzer catalog entries and the HF1000 reference can be selected for calculation and filter comparison under the software's CVVHD zero-net-UF conditions. Specialty water filters/plasma separators/adsorbers remain outside the urea model. This is numerical exploration, not a declaration of a device's clinical indication.
+
+Manufacturer comparisons are a separate gate: only an explicitly documented saline urea-clearance test with QF=0 is admitted. KUF blood-test conditions are never assigned to the clearance test. Unknown medium remains unverified, without making the physical filter unavailable. Dataset eligibility does not depend on its commercial category, accuracy relative to a10% band, or the presence of a CVVHD label. HF1000 is now selectable as either filter A or B.
