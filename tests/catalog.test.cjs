@@ -10,8 +10,25 @@ test('gross fraction uses total inlet flow, independent of concentration; zero-f
 test('manufacturer clearance and error bands cannot change inputs or prediction',()=>{const f=C.find('baxter-evodial-1-0'),before=C.properties(D,f.id,300),k=D.predict(before,'water',500).kWater,old=f.benchmarks;try{f.benchmarks=old.map(b=>({...b,k:1,lower:0,upper:100000}));assert.deepEqual(C.properties(D,f.id,300),before);assert.equal(D.predict(C.properties(D,f.id,300),'water',500).kWater,k);}finally{f.benchmarks=old;}});
 
 
-test('external validation requires documented saline clearance and zero UF independent of catalog indication',()=>{const ids=C.filters.filter(f=>C.comparable(f).length).map(f=>f.id).sort();assert.deepEqual(ids,['baxter-prismaflex-st60','baxter-prismaflex-st100','baxter-prismaflex-st150','medtronic-hcd-015','medtronic-hcd-025'].sort());for(const f of C.filters.filter(f=>C.comparable(f).length)){assert.ok(f.protocol.verifiedClearanceSource.url.startsWith('https://'));assert.match(f.protocol.verifiedClearanceSource.medium,/saline/);assert.equal(f.protocol.verifiedClearanceSource.qf,0);}const base=C.find(ids[0]);for(const protocol of [{...base.protocol,clearanceTestFluid:'water'},{...base.protocol,clearanceTestFluid:'blood'},{...base.protocol,clearanceTestFluid:'unknown'}])assert.equal(C.comparable({...base,protocol}).length,0);for(const qf of [undefined,1])assert.equal(C.comparable({...base,benchmarks:base.benchmarks.map(b=>({...b,qf}))}).length,0);assert.equal(C.comparable(C.find('baxter-evodial-1-0')).length,0);assert.equal(C.comparable({...base,protocol:{...base.protocol,cvvhdIndicated:false,validationEligible:false}}).length,C.comparable(base).length);});
+test('aqueous comparison eligibility preserves provenance and excludes nonzero UF',()=>{
+ const eligible=C.filters.filter(f=>C.comparable(f).length);assert.equal(eligible.length,115);
+ for(const f of eligible){assert.ok(['water','saline'].includes(f.protocol.clearanceTestFluid));assert.ok(f.protocol.verifiedClearanceSource);assert.ok(C.comparable(f).every(b=>b.qf===0));}
+ const base=C.find('baxter-prismaflex-st100');for(const fluid of ['blood','unknown'])assert.equal(C.comparable({...base,protocol:{...base.protocol,clearanceTestFluid:fluid}}).length,0);
+ for(const qf of [undefined,1])assert.equal(C.comparable({...base,benchmarks:base.benchmarks.map(b=>({...b,qf}))}).length,0);
+ for(const id of ['b-braun-xevonta-hi-20','fresenius-fx-paed','nipro-sureflux-03l']){const f=C.find(id);assert.ok(C.comparable(f).length);assert.equal(f.protocol.verifiedClearanceSource.kind,'user-confirmed');assert.equal(f.protocol.verifiedClearanceSource.url,undefined);}
+ assert.equal(C.find('baxter-theranova-400').protocol.clearanceTestFluid,'water');assert.ok(C.comparable(C.find('baxter-theranova-400')).length);
+ assert.equal(C.comparable(C.find('baxter-evodial-1-0')).length,0);
+ assert.equal(C.comparable({...base,protocol:{...base.protocol,cvvhdIndicated:false}}).length,C.comparable(base).length);
+});
 test('prediction error does not determine manufacturer dataset eligibility',()=>{const f=C.find('baxter-prismaflex-st100');assert.equal(C.comparable({...f,benchmarks:f.benchmarks.map(b=>({...b,k:1e6}))}).length,C.comparable(f).length);});
 test('eligible manufacturer operating conditions produce finite water predictions',()=>{for(const f of C.filters)for(const b of C.comparable(f)){const r=D.predict(C.properties(D,f.id,b.qb),'water',b.qd);assert.ok(Number.isFinite(r.kWater));assert.ok(Math.abs(r.hydraulics.net_mLmin)<1e-8);}});
 
-test('all hollow-fibre dialyzer presets remain available regardless of commercial indication',()=>{assert.equal(C.filters.filter(C.applicable).length,189);for(const f of C.filters)assert.equal(C.applicable(f),f.category!=='special');for(const id of ['reference','b-braun-xevonta-hi-18','b-braun-xevonta-hi-20','baxter-prismaflex-st100'])assert.ok(C.applicable(C.find(id)),id);});
+test('current selectors exclude requested manufacturers and retain pediatric and adult presets',()=>{
+ assert.equal(C.filters.filter(C.applicable).length,182);
+ for(const f of C.filters)assert.equal(C.applicable(f),f.category!=='special'&&!['Medtronic','Nephros'].includes(f.manufacturer));
+ for(const id of ['reference','b-braun-xevonta-hi-20','baxter-prismaflex-st100','fresenius-fx-paed','baxter-polyflux-2h'])assert.ok(C.applicable(C.find(id)),id);
+});
+test('out-of-band observations remain eligible and visible in downloadable audit',()=>{
+ const fs=require('node:fs'),csv=fs.readFileSync(require('node:path').join(__dirname,'../docs/catalog-clearance-audit.csv'),'utf8');
+ for(const id of ['nipro-sureflux-03l','baxter-prismaflex-st60']){const f=C.find(id),bad=C.comparable(f).filter(b=>Math.abs(100*(D.predict(C.properties(D,id,b.qb),'water',b.qd).kWater/b.k-1))>10);assert.ok(bad.length);assert.ok(csv.includes(id));}
+});

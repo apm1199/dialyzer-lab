@@ -11,7 +11,7 @@
   if(unlocked)return;unlocked=true;
   const root=document.getElementById('appRoot');root.replaceChildren(document.getElementById('workspaceTemplate').content.cloneNode(true));
   document.getElementById('signOut').addEventListener('click',()=>{clearSession();location.reload();});
-  try{for(const src of ['model.js','design.js','checks.js','catalog.js','app.js'])await loadScript(src+'?v=0.9.1');
+  try{for(const src of ['model.js','design.js','checks.js','catalog.js','app.js'])await loadScript(src+'?v=0.9.2');
    document.getElementById('accessGate').hidden=true;root.hidden=false;window.scrollTo(0,0);
   }catch(e){unlocked=false;root.replaceChildren();throw e;}
  }
