@@ -55,3 +55,15 @@ Validation offers manufacturer comparison points at each documented Qd. Explicit
 Prediction and Validation figures can be downloaded as a standalone SVG or 2100x1410 PNG. Exports include filter identity, operating conditions, predicted curve, nominal manufacturer points, error bars and the distinction between assumed bands and reported tolerances. There are no chart-library, network or backend dependencies for image export.
 
 The primary response chart uses a dashed marker at the currently selected Qd, rather than at the calibration endpoint. Its annotation and both image exports update with the selected dialysate flow. All public calibration attribution identifies Hematica in-vitro CVVHD experiments. HF1000 is retained only as a test module/filter identity, not as the supplier of calibration data.
+
+
+
+## Protocol audit and two-filter comparison (0.9.0)
+
+Validation now admits only documented aqueous, zero-net-UF urea tests for CVVHD-compatible devices: ST60/100/150 (11 points) and HCD015/025 (8). All 19 manufacturer tests use saline; the solver uses water properties, explicitly stated. Blood-test data and unknown clearance media are excluded. Blood references in KUF methods are never used to infer the clearance medium. Eligibility is independent of prediction error and ±10% display bands. ST curves vary Qd at fixed Qb, HCD curves vary Qb at fixed Qd. Each graph identifies physical inputs, assumed properties and sources. Internal reference reconstruction is separated under Research checks.
+
+Only the 17 documented CVVHD presets are selectable; other entries remain catalog-identifiable. Custom research design inputs remain available. Blood mode is a numerical extension, while external validation always uses water.
+
+Standard mode displays fibre count immediately. Estimates are labelled calculated, with assumed active length disclosed. A checkbox enables a measured/specified count and recomputes area consistently. The supplied workbook has Number of fibers headers but empty B.Braun/Baxter data cells. A separate reported-count table documents HF1000=7500/HF1400=9500 from Clark, Membranes for CRRT p.15 (data attributed to Baxter), and xevonta Hi18=11000 from Poorkhalil et al., DOI 10.1111/aor.13355, Table1. These are not relabelled as manufacturer datasheets or generalized to other variants. The Hi18 count is retained as literature information, not forced into geometry without confirming active length and nominal area consistency.
+
+The main graph compares two model predictions under shared flow, fluid, film and numerical settings. A uses edited inputs; B retains its physical membrane preset and assumptions. White denotes A, red B. The adaptive Qd marker, both curves and identity labels are included in image exports; B inputs/results are included in JSON. Manufacturer clearance never enters this calculation.

@@ -1,0 +1,11 @@
+# Aqueous CVVHD and fibre-count audit · 2026-11-04
+
+Validation: documented aqueous fluid AND explicit QF=0 AND documented CVVHD use. Only ST60/ST100/ST150 (11 points; saline37°C; ST150.pdf p.2 and Baxter.pdf p.10) and HCD015/HCD025 (8 points; NaCl0.9%; HCD product documents and015-025.pdf p.2) qualify in the supplied archive. Calculations retain water properties and disclose this saline approximation.
+
+Other brochures often specify blood only for hydraulic KUF tests, leaving urea-clearance medium unknown. Unknown media are excluded, never guessed blood or water. Evodial is excluded for protocol/scope, not its error exceeding10%. A ±10% assumed band is not an eligibility criterion, statistical confidence interval or universal model validation.
+
+17 CVVHD-compatible physical presets remain selectable. Physical properties missing from source are still assumptions; count calculated from assumed length is explicitly estimated. No numerical equations or coefficients were changed.
+
+B.Braun and Baxter workbook Number of fibers headers exist but their data cells are empty. No declared dialyzer count was found in the supplied manufacturer brochures. Microplas plasmafilter counts are outside this model. Additional references: Clark, Membranes for CRRT p.15 reports HF1000=7500/HF1400=9500, attributing CRRT dimensions to Dr Markus Storr(Baxter), https://www.irriv.com/system/educational_document/data/60/Clark_-_Membranes_for_CRRT.pdf. Poorkhalil et al., DOI10.1111/aor.13355, Table1 reports xevonta Hi18=11000; not manufacturer-datasheet provenance, and not evidence for every variant. That table's L280mm, di195um and N11000 imply1.887m2 versus nominal1.8m2; active-length definition and rounding require confirmation before forcing those values into one geometry. The source counts are displayed separately from the model estimate.
+
+Main comparison uses two physical filter designs with shared operating/fluid/numerical conditions, preserving A inputs. It supports clearance and gross filtration fraction; neither observed clearance nor its display interval enters predictions.

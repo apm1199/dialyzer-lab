@@ -6,7 +6,7 @@
 .designPanel{margin-top:24px}.designPanel .inputGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 20px}.designToggle{display:flex;align-items:center;gap:10px}.designToggle input{width:auto}@media(max-width:650px){.designPanel .inputGrid{grid-template-columns:1fr}}
 
 /* Prussian blue theme: white typography on every application surface. */
-button,a,option{color:#fff}.secondary{color:#fff}input[type=checkbox],input[type=range]{accent-color:#8fc7ef}input:disabled{opacity:.6}input::file-selector-button{background:#155276;color:#fff;border:1px solid var(--line);border-radius:4px;padding:7px}::selection{background:#397ba5;color:#fff}.chart circle{fill:#fff;stroke:#003153}.chart path{stroke:#fff}.chart line{stroke:#4d7b98}
+button,a,option{color:#fff}.secondary{color:#fff}input[type=checkbox],input[type=range]{accent-color:#8fc7ef}input:disabled{opacity:.6}input::file-selector-button{background:#155276;color:#fff;border:1px solid var(--line);border-radius:4px;padding:7px}::selection{background:#397ba5;color:#fff}
 
 .collaboratorLogo .hematicaWordmark img,.validationCredit .hematicaWordmark img{width:137px;height:47px;object-fit:contain}@media(max-width:730px){.collaboratorLogo .hematicaWordmark img,.validationCredit .hematicaWordmark img{width:103px;height:36px}}
 
@@ -28,7 +28,7 @@ input:focus,select:focus,button:focus-visible{outline-color:var(--hematica-blue)
 .contactCards article:first-child{border-top:3px solid var(--hematica-blue)}
 .contactCards article:last-child{border-top:3px solid var(--hematica-red)}
 .contactCards a{color:#fff}.contactCards a:hover{color:var(--hematica-blue)}
-.legend b{color:#ef8585}.chart circle{fill:#ef8585;stroke:#003153}.chart path{stroke:var(--hematica-blue)}.legend i{background:var(--hematica-blue)}
+.legend b{color:#ef8585}.legend i{background:var(--hematica-blue)}
 .tag{color:var(--hematica-blue);border-color:#5c8ba6}
 
 .accessGate{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px}.accessBrand{display:flex;align-items:center;gap:18px;margin-bottom:35px}.accessBrand>span{font-size:30px;font-weight:800;letter-spacing:-2px}.accessBrand>b{font-size:11px;letter-spacing:2px}.accessBrand img{border-left:1px solid var(--line);padding-left:18px;width:145px;height:47px;object-fit:contain}.accessCard{width:100%;max-width:440px;background:var(--white);border:1px solid var(--line);border-top:3px solid var(--hematica-red);border-radius:12px;padding:35px}.accessCard h1{font-size:42px;letter-spacing:-1.8px;margin-bottom:18px}.accessCard>p:not(.eyebrow){font-size:13px;color:var(--muted)}.accessCard .primary{margin-top:20px}.accessError{font-size:12px;color:#ffc3c3;padding:10px 0 0}.accessFoot{border-top:1px solid var(--line);padding-top:20px;margin:26px 0 0;font-size:11px!important}.accessCredit{font-size:11px;color:var(--muted);text-align:center;margin-top:24px}.accessActions{display:flex;align-items:center;gap:20px}.accessActions .secondary{margin:0;padding:7px 12px;min-height:34px;font-size:11px}.accessGate button:disabled{opacity:.6;cursor:wait}@media(max-width:500px){.accessBrand{gap:10px}.accessBrand>b{font-size:9px}.accessBrand img{width:112px;padding-left:12px}.accessCard{padding:25px}.accessCard h1{font-size:36px}.accessActions .secondary{padding:7px 9px}header:has(.accessActions){flex-wrap:wrap}}
@@ -44,3 +44,9 @@ input:focus,select:focus,button:focus-visible{outline-color:var(--hematica-blue)
 .figureActions{display:flex;flex-wrap:wrap;gap:.7rem;margin:1rem 0}.figureActions button{width:auto}
 
 .figureDownload{display:inline-flex;align-items:center;justify-content:center;padding:12px 16px;border:1px solid #4d7b98;border-radius:6px;color:#fff;text-decoration:none;font-size:.85rem;font-weight:600}.figureDownload:hover{background:#184b6d}
+
+
+.comparisonLegend{display:flex;flex-wrap:wrap;gap:.5rem 1.5rem;font-size:.85rem;margin:1rem 0}.curveB{color:#ef888c}.validationExclusions{margin:1rem 0}.validationExclusions .tableWrap{max-height:22rem;overflow:auto}#fiberCountSummary{border-left:2px solid #8fc7ef;padding-left:.7rem}#fiberCountOrigin{font-size:.72rem;line-height:1.4}#comparisonDetails{max-height:14rem;overflow:auto}
+
+/* Chart colours are set per SVG series and tolerance provenance. */
+.legend i{background:#fff}
