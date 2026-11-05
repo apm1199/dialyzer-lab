@@ -106,6 +106,6 @@ Public model-specific sources replace reference lengths for Clearum HS13/15/17/2
 
 Commercial catalog Lp inputs are interpreted as permeance normalised to inner exchange area. Thus k = Lp_SI × mu_pore × ri*ln(ro/ri). The original reference retains its planar convention k = Lp_SI × mu_pore × wall_thickness. Research exposes the convention; intrinsic Darcy input bypasses this conversion. Blood-measured KUF/A remains an equivalent hydraulic input and does not become a measured pristine-water permeability. Source KUF, nominal area, entered Lp, geometric area and equivalent Darcy k are shown separately. Qb/Qd never adjust Lp automatically. Manufacturer clearance values never set these inputs.
 
-## Shared module hydraulic conductance (0.10.1)
+## Shared module hydraulic conductance (0.10.2)
 
 Commercial presets and the default catalog comparison use an assumed module hydraulic conductance of 35 mL/(h·mmHg). On preset load the solver divides it by the model inner area to obtain Lp. Subsequent manual geometry edits retain the entered Lp. Research mode can load measured water profiles explicitly. Product KUF and manufacturer clearance observations do not set the assumed conductance. The historical reference retains its original parameter.

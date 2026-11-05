@@ -3,6 +3,7 @@
 'use strict';
 (() => {
  const HASH='84d2e0c530955993a7ee70b7557cf7d75dc9b4ba90b3b4b533a8ece2c912861b',KEY='dialyzerlab.personal-access.v1',LIFETIME=8*60*60*1000;
+ const assetQuery=new URL(document.currentScript.src).search;
  let unlocked=false;
  function validSession(){try{const t=Number(sessionStorage.getItem(KEY));return t>0&&Date.now()>=t&&Date.now()-t<LIFETIME;}catch{return false;}}
  function clearSession(){try{sessionStorage.removeItem(KEY);}catch{}}
@@ -11,7 +12,7 @@
   if(unlocked)return;unlocked=true;
   const root=document.getElementById('appRoot');root.replaceChildren(document.getElementById('workspaceTemplate').content.cloneNode(true));
   document.getElementById('signOut').addEventListener('click',()=>{clearSession();location.reload();});
-  try{for(const src of ['model.js','design.js','checks.js','catalog.js','catalog-design.js','catalog-sources.js','catalog-geometry.js','catalog-water.js','filter-status.js','transport-metrics.js','app.js'])await loadScript(src+'?v=0.10.0');
+  try{for(const src of ['model.js','design.js','checks.js','catalog.js','catalog-design.js','catalog-sources.js','catalog-geometry.js','catalog-water.js','filter-status.js','transport-metrics.js','app.js'])await loadScript(src+assetQuery);
    document.getElementById('accessGate').hidden=true;root.hidden=false;window.scrollTo(0,0);
   }catch(e){unlocked=false;root.replaceChildren();throw e;}
  }
