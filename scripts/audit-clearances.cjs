@@ -1,27 +1,22 @@
 /* Observations never change model inputs. Invalid points remain in the audit. */
-const fs=require('node:fs'),path=require('node:path'),C=require('../docs/catalog-geometry.js'),D=require('../docs/design.js');
+const fs=require('node:fs'),C=require('../docs/catalog-water.js'),D=require('../docs/design.js');
 const rows=[],groups={};
 for(const filter of C.filters.filter(C.applicable))for(const b of filter.benchmarks.filter(b=>b.qf===0)){
  const p=C.properties(D,filter.id,b.qb),eligible=C.comparable(filter).includes(b),g=D.geometry(p);let predicted=null,refined=null,error='';
- try{predicted=D.predict(p,'water',b.qd).kWater;if(eligible)refined=D.predict({...p,cells:400},'water',b.qd).kWater;}catch(e){error=e.message;}
+ try{if(!C.hydraulicProfile(D,filter.id,p).available)throw Error('Measured water Lp or equivalent Darcy permeability is missing.');predicted=D.predict(p,'water',b.qd).kWater;if(eligible)refined=D.predict({...p,cells:400},'water',b.qd).kWater;}catch(e){error=e.message;}
  const errorPct=predicted===null?null:100*(predicted/b.k-1);
  const r={id:filter.id,manufacturer:filter.manufacturer,filter:filter.name,eligible,medium:filter.protocol.clearanceTestFluid,mediumProvenance:filter.protocol.verifiedClearanceSource?.kind||'datasheet',area_m2:g.area,fibreCount:g.nf,moduleDiameter_mm:p.shellDiameter_mm,equivalentDialysateRadius_um:g.rd*1e6,packing:g.packing,smallAreaFlag:g.area<=.6,qb:b.qb,qd:b.qd,qf:b.qf,observed:b.k,predicted,errorPct,within10Pct:predicted===null?null:Math.abs(errorPct)<=10,status:predicted===null?'not-calculable':'calculated',error,cells:p.cells,predicted400Cells:refined,meshChangePct:refined===null?null:100*(refined/predicted-1),assumedProperties:C.assumptions(filter).join(';'),source:filter.source.file};rows.push(r);
  if(eligible){const a=groups[filter.manufacturer]??={points:0,calculated:0,within:0,max:0,filters:new Set()};a.points++;a.filters.add(filter.id);if(predicted!==null){a.calculated++;a.within+=r.within10Pct;a.max=Math.max(a.max,Math.abs(errorPct));}}
 }
-const columns=Object.keys(rows[0]).filter(k=>!['source','mediumProvenance','assumedProperties'].includes(k)),csv=v=>'"'+String(v??'').replaceAll('"','""')+'"';fs.writeFileSync(path.join(__dirname,'../reports/local-clearance-audit.csv'),[columns,...rows.map(r=>columns.map(c=>r[c]))].map(a=>a.map(csv).join(',')).join('\n')+'\n');
-let table='| Manufacturer | Models | Eligible points | Calculated | Within ±10% | Not calculable | Maximum absolute error |\n|---|---:|---:|---:|---:|---:|---:|\n';
-let html='<div id="catalogAuditSummary" class="tableWrap"><table><caption>Catalog audit · assumed 40 mm internal module diameter · 100 axial cells</caption><thead><tr><th>Manufacturer</th><th>Models</th><th>Eligible points</th><th>Calculated</th><th>Within ±10%</th><th>Not calculable</th><th>Maximum absolute difference</th></tr></thead><tbody>';
-for(const [m,g]of Object.entries(groups)){const a=[m,g.filters.size,g.points,g.calculated,g.within,g.points-g.calculated,g.max.toFixed(2)+'%'];table+='| '+a.join(' | ')+' |\n';html+='<tr>'+a.map(v=>'<td>'+v+'</td>').join('')+'</tr>';}
-const valid=rows.filter(r=>r.eligible&&r.predicted!==null),invalid=rows.filter(r=>r.eligible&&r.predicted===null),maxMesh=Math.max(...valid.map(r=>Math.abs(r.meshChangePct)));
-html+='</tbody></table></div><p class="hint" id="catalogAuditNote">Module internal diameter is assumed to be 40 mm unless reported otherwise. Calibration retains its original geometry and coefficients. Saline medium for B. Braun, Fresenius and Nipro is project-owner confirmed; Theranova is documented aqueous. Missing physical properties remain assumptions. Noncalculable points remain in the CSV and per-filter table and are excluded from error percentages. The 100-to-400 cell refinement changes calculated predictions by at most '+maxMesh.toFixed(2)+'%; this is not proof of universal accuracy.</p>';
-const indexPath=path.join(__dirname,'../docs/index.html');let index=fs.readFileSync(indexPath,'utf8');
-if(index.includes('<div id="catalogAuditSummary"'))index=index.replace(/<div id="catalogAuditSummary"[\s\S]*?<p class="hint" id="catalogAuditNote">[\s\S]*?<\/p>/,html);
-else index=index.replace(/<div class="tableWrap"><table><caption>Catalog audit[\s\S]*?<\/table><\/div><p class="hint">Saline clearance medium[\s\S]*?<\/p>/,html);
-fs.writeFileSync(indexPath,index);
-let md='# Clearance comparison audit · v0.9.8\n\nDesign calculations use a fixed40 mm internal module diameter as an assumption unless documented otherwise. Packing and equivalent dialysate radius follow fibre count. The original reference-normalisation geometry remains unchanged (packing0.5; equivalent internal module diameter38.6162mm for the HF1000 geometry). No empirical coefficients or manufacturer clearance targets are fitted. Enter0 for module diameter in Research mode to prescribe packing instead.\n\n'+table;
-md+='\nEligibility uses the aqueous zero-UF protocol, independently of numerical success or accuracy. B.Braun/Fresenius/Nipro saline medium is project-owner confirmed. Theranova A6/A7 is documented aqueous and ST documented saline. Unknown media/nonzero UF are not admitted; Medtronic/Nephros remain outside current selection.\n\n## Noncalculable eligible observations\n\n';for(const r of invalid)md+=`- ${r.manufacturer} ${r.filter}: Qb=${r.qb}, Qd=${r.qd}. ${r.error}\n`;
-md+='\nThese points remain visible and are not assigned zero clearance or treated as clinical incompatibility. The reference length or assumed40mm internal diameter may require correction from physical measurements. No automatic enlargement or packing fallback is applied.\n\n## Small-area modules (area ≤0.6m²; not a clinical classification)\n\n| Model | Qb | Qd | Observed | Predicted | Difference |\n|---|---:|---:|---:|---:|---:|\n';for(const r of valid.filter(r=>r.smallAreaFlag))md+=`| ${r.filter} | ${r.qb} | ${r.qd} | ${r.observed} | ${r.predicted.toFixed(2)} | ${r.errorPct.toFixed(2)}% |\n`;
-md+='\n## Models with points outside ±10%\n\n| Model | Outside / calculated | Error range |\n|---|---:|---:|\n';for(const id of new Set(valid.filter(r=>!r.within10Pct).map(r=>r.id))){const a=valid.filter(r=>r.id===id);md+=`| ${a[0].manufacturer} ${a[0].filter} | ${a.filter(r=>!r.within10Pct).length}/${a.length} | ${Math.min(...a.map(r=>r.errorPct)).toFixed(2)} to ${Math.max(...a.map(r=>r.errorPct)).toFixed(2)}% |\n`;}
-md+='\nMaximum absolute100-to-400 cell refinement change: '+maxMesh.toFixed(3)+'%. This is a refinement check, not a full convergence proof. Theranova workbookA7 QB-code inconsistency is resolved against the retained manufacturer datasheet, whose aqueous table explicitly gives400/800 and500/800.\n';fs.writeFileSync(path.join(__dirname,'../reports/catalog-clearance-audit.md'),md);
-console.log(JSON.stringify({eligible:valid.length+invalid.length,calculated:valid.length,within10:valid.filter(r=>r.within10Pct).length,notCalculable:invalid.length,maxMeshChangePct:maxMesh,groups:Object.fromEntries(Object.entries(groups).map(([k,g])=>[k,{...g,filters:g.filters.size}]))},null,2));
-
+const valid=rows.filter(r=>r.eligible&&r.predicted!==null);
+const invalid=rows.filter(r=>r.eligible&&r.predicted===null);
+const summary={
+ eligible:valid.length+invalid.length,
+ calculated:valid.length,
+ within10:valid.filter(r=>r.within10Pct).length,
+ notCalculable:invalid.length,
+ groups:Object.fromEntries(Object.entries(groups).map(([k,g])=>[k,{...g,filters:g.filters.size}]))
+};
+const report=JSON.stringify({summary,rows},null,2)+'\n';
+if(process.argv[2]==='--output'&&process.argv[3])fs.writeFileSync(process.argv[3],report);
+else process.stdout.write(report);

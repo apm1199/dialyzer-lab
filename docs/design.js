@@ -9,6 +9,7 @@ const designDefaults={...defaults,shellDiameter_mm:40};
 function need(v,m){if(!v)throw Error(m);}
 function validate(input){
  const p={...defaults,...input};
+ if(p.hydraulicMode==='Lp'){need(Number.isFinite(p.Lp),'A measured water Lp is required; blood KUF/A is not used.');if(!Number.isFinite(p.darcy_m2))p.darcy_m2=0;}else{need(Number.isFinite(p.darcy_m2),'A measured or water-derived Darcy permeability is required.');if(!Number.isFinite(p.Lp))p.Lp=0;}
  for(const k of Object.keys(input))need(k in defaults,'Unknown design property: '+k);
  for(const [k,v]of Object.entries(p))if(!['rheology','hydraulicMode','hydraulicBasis'].includes(k))need(Number.isFinite(v),'A finite value is required: '+k);
  for(const k of ['feedFlow_mLmin','area_m2','length_mm','diameter_um','thickness_um','tortuosity','membraneDiffusivity','hindrance','muPore','muWater','muBlood','mu0','muInf','carreauTime','carreauA','waterDiffusivity','bloodDiffusivity','dialysateDiffusivity','ShBlood','ShDialysate'])need(p[k]>0,'A positive value is required: '+k);
