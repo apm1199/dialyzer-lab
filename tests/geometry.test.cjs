@@ -5,3 +5,11 @@ test('Clearum total module lengths never become active fibre lengths',()=>{for(c
 test('reported active lengths survive loading; editing does not rewrite catalog',()=>{const id='nipro-elisio-17h',p=C.properties(D,id),before=JSON.stringify(C.find(id));assert.equal(p.length_mm,271);assert.equal(C.geometryProfile(D,id,p).rows.find(r=>r.key==='length_mm').state,'catalog value');const modified=C.geometryProfile(D,id,{...p,length_mm:260});assert.equal(modified.rows.find(r=>r.key==='length_mm').state,'modified input');assert.equal(JSON.stringify(C.find(id)),before);});
 test('area-based counts inherit geometry assumptions and remain distinguishable from reported counts',()=>{const id='b-braun-xevonta-hi-20',p=C.properties(D,id),g=C.geometryProfile(D,id,p),row=g.rows.find(r=>r.key==='fiberCount');assert.equal(g.moduleDiameterAssumed,true);assert.equal(row.state,'derived; inherits input assumptions');assert.ok(Math.abs(row.value-D.geometry(p).nf)<1e-9);assert.ok(g.missingCore.includes('length_mm'));assert.ok(g.warning.includes('reference assumptions'));});
 test('FX60 uses the coherent manufacturer comparison specimen rather than a reference active length',()=>{const p=C.properties(D,'fresenius-fx-60');assert.equal(p.length_mm,228);assert.equal(p.fiberCount,10752);assert.equal(p.diameter_um,184);assert.equal(p.thickness_um,37);assert.equal(p.shellDiameter_mm,34);assert.match(C.find('fresenius-fx-60').geometryFieldSources.length_mm.url,/US20240286082/);assert.ok(p.Lp>0);});
+test('xevonta study length applies only to Hi 18 and carries its measurement qualification',()=>{
+ const id='b-braun-xevonta-hi-18',p=C.properties(D,id);
+ assert.equal(p.length_mm,280);
+ assert.equal(C.geometryProfile(D,id,p).rows.find(r=>r.key==='length_mm').state,'study membrane length; free length unverified');
+ for(const f of C.filters.filter(f=>/xevonta/i.test(f.name)&&f.id!==id)){
+  assert.notEqual(C.properties(D,f.id).length_mm,280);
+ }
+});
