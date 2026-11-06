@@ -2,7 +2,7 @@
 (function(root){
 'use strict';
 const M=typeof module!=='undefined'&&module.exports?require('./model.js'):root.DialyzerModel;
-const F=1e-6/60,MMHG=133.322387415;
+const F=1e-6/60,MMHG=133.322387415,LP_TO_SI=1e-6/3600/MMHG;
 const defaults={fiberCount:0,shellDiameter_mm:0,totalLength_mm:0,feedFlow_mLmin:100,hydraulicMode:'Lp',hydraulicBasis:'planar',darcy_m2:3.343574515699709e-18,area_m2:M.geometry.area,length_mm:218,diameter_um:2*M.geometry.ri*1e6,thickness_um:(M.geometry.ro-M.geometry.ri)*1e6,packing:.5,porosity:.5205,tortuosity:Math.SQRT2,membraneDiffusivity:1.9e-9,hindrance:1,Lp:32,muPore:.00100299,muWater:.00100299,muBlood:.0035,rheology:'carreau',mu0:.0225,muInf:.0022,carreauTime:.11,carreauN:.392,carreauA:.644,hematocrit:.35,plasmaWater:.93,rbcWater:.72,waterDiffusivity:1.9e-9,bloodDiffusivity:7.4e-10,dialysateDiffusivity:1.9e-9,ShBlood:4.36,ShDialysate:3.66,cells:100};
 // Preserve the original calibration geometry; design exploration assumes a 40 mm module.
 const designDefaults={...defaults,shellDiameter_mm:40};
@@ -30,8 +30,8 @@ function geometry(p){
  const ri=p.diameter_um*1e-6/2,ro=ri+p.thickness_um*1e-6,L=p.length_mm/1000;
  const nf=p.fiberCount>0?p.fiberCount:p.area_m2/(2*Math.PI*ri*L),area=2*Math.PI*ri*L*nf;
  const shellRadius=p.shellDiameter_mm>0?p.shellDiameter_mm/2000:ro*Math.sqrt(nf/p.packing),rd=shellRadius/Math.sqrt(nf),packing=ro*ro/(rd*rd),lc=ri*Math.log(ro/ri);
- const lp=p.Lp*1e-6/3600/MMHG,k=p.hydraulicMode==='darcy'?p.darcy_m2:lp*p.muPore*(p.hydraulicBasis==='inner-area'?lc:ro-ri),lpCyl=k/(p.muPore*lc);
- return {ri,ro,L,nf,area,rd,shellRadius,packing,lc,lp,k,lpCyl,dx:L/p.cells,da:area/p.cells,ab:nf*Math.PI*ri**2,ad:nf*Math.PI*(rd*rd-ro*ro)};
+ const lp=p.Lp*LP_TO_SI,k=p.hydraulicMode==='darcy'?p.darcy_m2:lp*p.muPore*(p.hydraulicBasis==='inner-area'?lc:ro-ri),lpCyl=k/(p.muPore*lc);
+ return {ri,ro,L,nf,area,rd,shellRadius,packing,lc,lp,k,lpCyl,moduleConductance_mL_h_mmHg:lpCyl*area/LP_TO_SI,dx:L/p.cells,da:area/p.cells,ab:nf*Math.PI*ri**2,ad:nf*Math.PI*(rd*rd-ro*ro)};
 }
 function hydraulics(p,fluid,qd,qb=p.feedFlow_mLmin,uf=0){
  const g=geometry(p),N=p.cells,B0=qb*F,D0=qd*F,B1=B0-uf*F,fw=fluid==='water'?1:(1-p.hematocrit)*p.plasmaWater+p.hematocrit*p.rbcWater,nw=B0*(1-fw);
@@ -102,7 +102,7 @@ function predict(input,fluid,qd,cBulk=.885,options={}){
  const {uf=0,resistance}=options;
  const p=validate(input);need(['water','blood'].includes(fluid),'Unknown feed fluid.');need(Number.isFinite(qd)&&qd>=0,'Dialysate flow must be finite and nonnegative.');need(cBulk>0&&Number.isFinite(cBulk),'A positive concentration is required.');
  const effectiveQd=qd+uf,coefficientFlow=Math.min(effectiveQd,133.33),reference=M.predict(M.presets[fluid],coefficientFlow,cBulk),fw=fluid==='water'?1:(1-p.hematocrit)*p.plasmaWater+p.hematocrit*p.rbcWater,qw=p.feedFlow_mLmin*fw;
- if(qd===0&&uf===0)return {...reference,qb:p.feedFlow_mLmin,qw,cWaterIn:cBulk/fw,cWaterOut:cBulk/fw,design:p,additionalSoluteResistance_s_m:null,hydraulics:null,filtrationFraction:null,filtrationFractionPct:null,materialDiffusivity:p.membraneDiffusivity*p.porosity/p.tortuosity*p.hindrance,hydraulicDarcy:geometry(p).k,status:'Zero-flow design limit',model:'Reference-normalised 1D design model'};
+ if(qd===0&&uf===0){const g=geometry(p);return {...reference,qb:p.feedFlow_mLmin,qw,cWaterIn:cBulk/fw,cWaterOut:cBulk/fw,design:p,additionalSoluteResistance_s_m:null,hydraulics:null,filtrationFraction:null,filtrationFractionPct:null,materialDiffusivity:p.membraneDiffusivity*p.porosity/p.tortuosity*p.hindrance,hydraulicDarcy:g.k,moduleConductance_mL_h_mmHg:g.moduleConductance_mL_h_mmHg,status:'Zero-flow design limit',model:'Reference-normalised 1D design model'};}
  const key=fluid+'|'+effectiveQd.toPrecision(12)+'|'+p.cells;let base=cache.get(key);if(!base){base=raw({...defaults,cells:p.cells},fluid,effectiveQd);if(cache.size>500)cache.clear();cache.set(key,base);}
  const current=raw(p,fluid,qd,{uf,resistance});
  const baseKoa=apparent(base.solute.k,100*M.presets[fluid].fw,effectiveQd);
@@ -112,7 +112,7 @@ function predict(input,fluid,qd,cBulk=.885,options={}){
  const koa=reference.koa*tailFactor*ratio;
  const k=M.kFromKoa(koa,qw,effectiveQd),cw=cBulk/fw;
  const h=current.flow,g=h.g;
- return {...reference,netUF:uf,qd,qb:p.feedFlow_mLmin,qw,koa,kWater:k,kBulk:k/fw,cWaterIn:cw,cWaterOut:cw*(qw-k)/(qw-uf),cBulkOut:cw*(qw-k)/(p.feedFlow_mLmin-uf),cDialysateOut:k*cw/effectiveQd,removal_mgmin:k*cw,equivalentFactor:null,dapp:g.lc/current.solute.rm,additionalSoluteResistance_s_m:Number.isFinite(current.solute.rAdd)?current.solute.rAdd:null,design:p,conductanceRatio:ratio,hydraulicDarcy:g.k,materialDiffusivity:current.solute.material,model:'Reference-normalised 1D design model',coefficientFlow_mLmin:coefficientFlow,extrapolated:qd>133.33,continuation:qd>133.33?transportContinuation(qd):null,status:qd>133.33?'Exploratory extrapolation · asymptotic decay of unresolved reference resistance':'Design exploration · unvalidated parameter transfer',filtrationFraction:h.forward/(p.feedFlow_mLmin*F),filtrationFractionPct:100*h.forward/(p.feedFlow_mLmin*F),hydraulics:{forward_mLmin:h.forward/F,back_mLmin:h.back/F,net_mLmin:h.net/F,bloodPressureDrop_mmHg:(h.pb[0]-h.pb.at(-1))/MMHG,dialysatePressureDrop_mmHg:(h.pd.at(-1)-h.pd[0])/MMHG,peakTMP_mmHg:Math.max(...h.tmp.map(Math.abs))/MMHG,axialReversal:h.axialReversal,fibers:g.nf,massBalanceRelative:current.solute.balance,x_m:Array.from({length:p.cells},(_,i)=>(i+.5)*g.dx),Jv_ms:h.jv,PeBarrier:current.solute.barrierPe,barrierPermeability_ms:current.solute.barrierPermeability,rawCb:current.solute.cb,rawCd:current.solute.cd,waterFraction:h.fwMid},rawReferenceClearance:base?.solute.k??null,rawDesignClearance:current.solute.k};
+ return {...reference,netUF:uf,qd,qb:p.feedFlow_mLmin,qw,koa,kWater:k,kBulk:k/fw,cWaterIn:cw,cWaterOut:cw*(qw-k)/(qw-uf),cBulkOut:cw*(qw-k)/(p.feedFlow_mLmin-uf),cDialysateOut:k*cw/effectiveQd,removal_mgmin:k*cw,equivalentFactor:null,dapp:g.lc/current.solute.rm,additionalSoluteResistance_s_m:Number.isFinite(current.solute.rAdd)?current.solute.rAdd:null,design:p,conductanceRatio:ratio,hydraulicDarcy:g.k,moduleConductance_mL_h_mmHg:g.moduleConductance_mL_h_mmHg,materialDiffusivity:current.solute.material,model:'Reference-normalised 1D design model',coefficientFlow_mLmin:coefficientFlow,extrapolated:qd>133.33,continuation:qd>133.33?transportContinuation(qd):null,status:qd>133.33?'Exploratory extrapolation · asymptotic decay of unresolved reference resistance':'Design exploration · unvalidated parameter transfer',filtrationFraction:h.forward/(p.feedFlow_mLmin*F),filtrationFractionPct:100*h.forward/(p.feedFlow_mLmin*F),hydraulics:{forward_mLmin:h.forward/F,back_mLmin:h.back/F,net_mLmin:h.net/F,bloodPressureDrop_mmHg:(h.pb[0]-h.pb.at(-1))/MMHG,dialysatePressureDrop_mmHg:(h.pd.at(-1)-h.pd[0])/MMHG,peakTMP_mmHg:Math.max(...h.tmp.map(Math.abs))/MMHG,axialReversal:h.axialReversal,fibers:g.nf,massBalanceRelative:current.solute.balance,x_m:Array.from({length:p.cells},(_,i)=>(i+.5)*g.dx),Jv_ms:h.jv,PeBarrier:current.solute.barrierPe,barrierPermeability_ms:current.solute.barrierPermeability,rawCb:current.solute.cb,rawCd:current.solute.cd,waterFraction:h.fwMid},rawReferenceClearance:base?.solute.k??null,rawDesignClearance:current.solute.k};
 }
 const api={defaults,designDefaults,validate,geometry,hydraulics,transportContinuation,raw,predict};if(typeof module!=='undefined'&&module.exports)module.exports=api;root.DialyzerDesign=api;
 })(typeof window!=='undefined'?window:globalThis);
