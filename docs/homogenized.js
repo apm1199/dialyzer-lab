@@ -3,23 +3,26 @@
 const M=typeof module==='undefined'?root.DialyzerModel:require('./model.js');
 const F=1e-6/60, MMHG=133.322387415, DM=6.9929e-10, MU=1.00299136e-3;
 function requireValue(ok,message){if(!ok)throw Error(message);}
-function calibrationFromMarkdown(source){
- const lines=source.replaceAll('\\','').split(/\r?\n/);
- const data=lines.map(line=>line.trim().split('|').slice(1,-1).map(s=>Number(s.trim())));
- const rows=data.filter(row=>row.length===8&&[0,10].includes(row[0])&&row.slice(1).every(Number.isFinite)&&row[4]>0&&row[5]>=0);
- for(const uf of [0,10]){
-  const branch=rows.filter(r=>r[0]===uf).sort((a,b)=>a[1]-b[1]);
-  requireValue(branch.length===3&&branch.every((r,i)=>r[1]===[200,300,400][i]&&Math.abs(r[4]-r[5]-37518.664)<.01),'Expected the six Phylter HF 17SD scalar calibration rows (UF 0/10, Qb 200/300/400).');
- }
- const shellK=Number(source.match(/diag\((\d+(?:\.\d+)?)×10⁻¹⁰, 0, 0\) m²[^\n]*Fittizia/)?.[1])*1e-10;
- requireValue(shellK>0,'The reported dialysate Darcy permeability was not found in the Markdown.');
- const areaDensity=Number(source.match(/\|\s*(\d+\.\d+)\s*m⁻¹[^\n]*corretta per il volume/)?.[1]);
- requireValue(areaDensity>0,'The mesh-corrected exchange area density was not found in the Markdown.');
- return {rows,shellK,areaDensity};
+// UF, module inlet flow, additional resistance, calibrated CFD clearance.
+const calibration={shellK:3.7667166684075203e-10,areaDensity:5607.114060802348,rows:[
+ [0,200,45014.799,197.011],[0,300,39782.223,277.000],[0,400,40602.709,328.961],
+ [10,200,40641.272,198.004],[10,300,39913.510,279.001],[10,400,40367.677,332.991]
+]};
+const referencePreset={
+ fibres:11200,area:calibration.areaDensity*Math.PI*.02**2*.241,housing:40,
+ caseLength:305,length:241,bore:200,wall:30,lp:31.68,shellK:calibration.shellK
+};
+function catalogPreset(C,D,id){
+ const p=C.properties(D,id),g=D.geometry(p);
+ return {
+  fibres:p.fiberCount||Math.round(g.nf),area:g.area,housing:p.shellDiameter_mm,
+  caseLength:p.totalLength_mm||0,length:p.length_mm,bore:p.diameter_um,wall:p.thickness_um,
+  lp:g.lpCyl*3600*MMHG/1e-6,shellK:calibration.shellK
+ };
 }
-function predict(p,cal,cells=240){
+function predict(p,cal=calibration,cells=240){
  const {qb,qd,uf,area,fibres,bore,wall,housing,length,caseLength,lp,shellK}=p;
- requireValue(Object.values(p).every(Number.isFinite)&&[0,10].includes(uf)&&qb>uf&&qd>=0&&[area,fibres,bore,wall,housing,length,caseLength,lp,shellK].every(x=>x>0)&&Number.isInteger(fibres)&&caseLength>=length,'Enter positive geometry and hydraulic properties, Qb > UF, Qd ≥ 0 and an overall length at least as large as active length.');
+ requireValue(Object.values(p).every(Number.isFinite)&&[0,10].includes(uf)&&qb>uf&&qd>=0&&[area,fibres,bore,wall,housing,length,lp,shellK].every(x=>x>0)&&Number.isInteger(fibres)&&(caseLength===0||caseLength>=length),'Enter positive geometry and hydraulic properties, Qb > UF, Qd ≥ 0 and, if supplied, an overall length at least as large as active length.');
  const ri=bore*5e-7,ro=ri+wall*1e-6,R=housing/2000,L=length/1000,S=Math.PI*R*R;
  const eb=fibres*(ri/R)**2,ed=1-fibres*(ro/R)**2;
  requireValue(eb>0&&ed>0,'The fibres do not fit inside the housing.');
@@ -27,7 +30,7 @@ function predict(p,cal,cells=240){
  const activeArea=area;
  const intrinsic=ri*Math.log(ro/ri)/DM;
  const branch=cal.rows.filter(r=>r[0]===uf).sort((a,b)=>a[1]-b[1]);
- const nodes=branch.map(r=>r[1]), referenceRadd=M.interpolate(nodes,branch.map(r=>r[5]),Math.min(nodes.at(-1),Math.max(nodes[0],qb)));
+ const nodes=branch.map(r=>r[1]), referenceRadd=M.interpolate(nodes,branch.map(r=>r[2]),Math.min(nodes.at(-1),Math.max(nodes[0],qb)));
  const at500=1/(intrinsic+referenceRadd), limit=1/intrinsic;
  // Two-knot PCHIP is linear. Match its terminal slope to an exponential tail.
  const permeance=qd<=500?M.interpolate([0,500],[0,at500],qd):limit-(limit-at500)*Math.exp(-(qd-500)*at500/(500*(limit-at500)));
@@ -75,6 +78,6 @@ function predict(p,cal,cells=240){
  requireValue(Number.isFinite(clearance)&&clearance>=0&&Math.abs(clearance-(qb-b[cells]*outletLumen))<1e-6*qb,'The urea mass balance did not close.');
  return {...result,clearance,forward,back};
 }
-const api={calibrationFromMarkdown,predict};
+const api={referencePreset,catalogPreset,predict};
 if(typeof module!=='undefined')module.exports=api;else root.DialyzerHomogenized=api;
 })(typeof window==='undefined'?globalThis:window);
