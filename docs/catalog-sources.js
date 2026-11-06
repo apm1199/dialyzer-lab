@@ -13,6 +13,28 @@ for(const [size,length_mm,fiberCount,totalLength_mm] of [[15,237,10750,300],[18,
  record('b-braun-xevonta-hi-'+size,{length_mm,fiberCount,totalLength_mm},xevontaHi,'Effective fibre length ±5 mm, fibre count ±1.5%, and module length without protective caps ±2 mm. The nominal area is separate from the model area calculated from fibre geometry.');
 }
 record('fresenius-fx-60',{length_mm:228,fiberCount:10752,diameter_um:184,thickness_um:37,shellDiameter_mm:34},{label:'Fresenius manufacturer patent US20240286082A1',url:'https://patents.google.com/patent/US20240286082A1/en',location:'Table1, commercial FX60 comparative specimen'},'Geometry follows the coherent FX60 comparative specimen reported by the manufacturer: free effective length228mm,10752fibres,184µm bore,37µm wall and34mm internal housing. This is specimen-specific; check commercial edition compatibility against nominal datasheet dimensions. No clearance value from the patent is used.');
+const phylther={label:'Bellco PHYLTHER HF technical data sheet, Rev. 04 (12/2013)',url:'https://id.scribd.com/document/410808412/Tech-Sheet-Phylther-Hf-Rev-04-gb',location:'p. 4, technical characteristics'};
+for(const [size,area_m2,length_mm,fiberCount,shellDiameter_mm,totalLength_mm,urea] of [
+ [11,1.1,241,7200,31.5,305,[193,262,304]],
+ [13,1.3,241,8600,34.5,305,[195,267,313]],
+ [15,1.5,241,9600,36.5,305,[196,273,322]],
+ [17,1.7,241,11200,39.5,305,[197,277,329]],
+ [20,2.0,301,10400,39.5,365,[198,278,331]],
+ [22,2.2,301,11400,39.5,365,[198,279,333]]
+]){
+ for(const variant of ['G','SD']){
+  const id='bellco-phylther-hf-'+size+'-'+variant.toLowerCase();
+  C.filters.push({
+   id,name:'Phylther HF '+size+' '+variant,manufacturer:'Bellco',category:'chronic-hd',
+   material:'Polyphenylene H · '+(variant==='G'?'gamma sterilised':'moist-heat sterilised'),
+   properties:{},source:{file:phylther.label,page:4,url:phylther.url},
+   notes:['The technical sheet lists HD, HF and HDF. The preset is available for numerical exploration. The zero-UF urea table follows EN1283 and reports common values for G and SD, but does not identify the clearance test fluid. These points are excluded from aqueous validation.'],
+   benchmarks:urea.map((k,i)=>({qb:200+100*i,qd:500,qf:0,k})),
+   protocol:{clearanceTestFluid:'unknown',requireAqueousClearanceEvidence:true}
+  });
+  record(id,{area_m2,length_mm,fiberCount,shellDiameter_mm,totalLength_mm,diameter_um:200,thickness_um:30},phylther,'Uses effective fibre length and the minimum reported internal housing diameter as the equivalent bore. The nominal area is separate from the area calculated from fibre geometry.');
+ }
+}
 for(const r of corrections)if(r.values.fiberCount&&!C.reportedCounts.some(x=>x.name===C.find(r.id).name))C.reportedCounts.push({name:C.find(r.id).name,count:r.values.fiberCount,source:r.source.label+' · '+r.source.location,scope:'Model-specific reported count; area calculated from count and dimensions may differ from nominal area.'});
 const api={...C,geometryCorrections:corrections};if(typeof module!=='undefined'&&module.exports)module.exports=api;root.DialyzerCatalog=api;
 })(typeof window!=='undefined'?window:globalThis);

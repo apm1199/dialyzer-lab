@@ -6,8 +6,8 @@ const missingActiveLength=new Set(['medtronic-hcd-015','medtronic-hcd-025']);
 const theralite=C.find('baxter-theralite');if(theralite)theralite.modelRole='hollow-fibre-dialyzer';
 function applicable(f){return !!f&&(f.category!=='special'||f.modelRole==='hollow-fibre-dialyzer');}
 function properties(D,id,qb){const f=C.find(id);if(!applicable(f))throw Error('Not a supported blood/dialysate hollow-fibre urea device.');const p={...D.designDefaults};for(const [k,v]of Object.entries(f.properties))if(k in p)p[k]=v;if(id!=='reference'&&f.properties.Lp!==undefined)p.hydraulicBasis='inner-area';if(qb!==undefined)p.feedFlow_mLmin=qb;if(totalLengths[id]&&!p.totalLength_mm)p.totalLength_mm=totalLengths[id];if(missingActiveLength.has(id)&&!f.properties.length_mm)p.length_mm=0;return p;}
-function comparable(f){return applicable(f)?f.benchmarks.filter(b=>b.qf===0):[];}
-function exclusionReasons(f){const out=[];if(!applicable(f))out.push('Not a blood/dialysate urea dialyzer');if(!f.benchmarks.some(b=>b.qf===0))out.push('No explicitly documented zero-net-UF urea point');return out;}
+function comparable(f){return applicable(f)&&(!f.protocol?.requireAqueousClearanceEvidence||['water','saline'].includes(f.protocol.clearanceTestFluid))?f.benchmarks.filter(b=>b.qf===0):[];}
+function exclusionReasons(f){const out=[];if(!applicable(f))out.push('Not a blood/dialysate urea dialyzer');if(f.protocol?.requireAqueousClearanceEvidence&&!['water','saline'].includes(f.protocol.clearanceTestFluid))out.push('Aqueous clearance-test medium not confirmed');if(!f.benchmarks.some(b=>b.qf===0))out.push('No explicitly documented zero-net-UF urea point');return out;}
 function profile(D,id,p){
  const f=C.find(id),reference=id==='reference',custom=!f,rows=[],missing=[];
  const specs=[['area_m2','Membrane area','m²'],['length_mm','Active fibre length','mm'],['diameter_um','Fibre inner diameter','µm'],['thickness_um','Membrane thickness','µm']];
