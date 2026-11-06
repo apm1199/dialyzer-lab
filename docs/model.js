@@ -128,6 +128,6 @@ function identifyStep(text){
  for(let i=split;i<r.length;i++)err+=(r[i].output-fitted[i])**2;
  return {...best,rmseTrain:Math.sqrt(best.sse/train.length),rmseHoldout:Math.sqrt(err/hold.length),split,rows:r,fitted,source:'Grid-based identification; final samples excluded from fitting; no confidence intervals.'};
 }
-const api={geometry,dappNodes,effectiveDapp,transportNodes,domain,presets,koaFromK,kFromKoa,interpolate,validateDataset,predict,crossValidate,parseCSV,importSteady,membrane,stepResponse,identifyStep};
+const api={geometry,dappNodes,effectiveDapp,transportNodes,domain,presets,koaFromK,kFromKoa,interpolate,pchipSlopes,validateDataset,predict,crossValidate,parseCSV,importSteady,membrane,stepResponse,identifyStep};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;root.DialyzerModel=api;
 })(typeof window!=='undefined'?window:globalThis);
