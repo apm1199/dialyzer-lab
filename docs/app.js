@@ -131,8 +131,61 @@ $('chartMetric').addEventListener('change',safe(updateStatic));$('filterPreset')
 $('validationFilter').addEventListener('change',safe(()=>{validationKey=null;updateValidation();}));
 $('resetResearch').addEventListener('click',safe(()=>{const defaults=C.find(geometryOrigin)?C.properties(D,geometryOrigin):D.designDefaults;document.querySelectorAll('[data-property]').forEach(e=>{if(!primaryKeys.includes(e.dataset.property))e.value=e.type==='number'&&!Number.isFinite(defaults[e.dataset.property])?'':defaults[e.dataset.property];});updateStatic();}));
 $('resetDesign').addEventListener('click',safe(()=>{document.querySelectorAll('[data-property]').forEach(e=>e.value=D.designDefaults[e.dataset.property]);$('useFiberCount').checked=false;$('filterPreset').value='reference';geometryOrigin='reference';activeHydraulicProfileId=null;set('presetNotes','Design settings restored · assumed module internal diameter 40 mm.');updateStatic();}));
-$('export').addEventListener('click',safe(()=>{updateStatic();download('dialyzer-result.json',JSON.stringify({version:'0.10.8',created:new Date().toISOString(),scope:'Urea · pristine membrane · steady CVVHD · zero net UF',developmentData:'Hematica · in-vitro CVVHD experiments',filterPreset:$('filterPreset').value,properties:readDesign(),geometryProvenance:C.geometryProfile(D,geometryOrigin,readDesign()),hydraulicProvenance:C.hydraulicProfile(D,geometryOrigin,readDesign(),activeHydraulicProfileId),result:last,transportMetrics:T.fromResult(last),manufacturerKoaComparison:updateKoaComparison(),filterComparison:lastComparison?{filterId:lastComparison.filterId,properties:lastComparison.properties,result:lastComparison.result}:null},null,2));}));
+$('export').addEventListener('click',safe(()=>{updateStatic();download('dialyzer-result.json',JSON.stringify({version:'0.11.0',created:new Date().toISOString(),scope:'Urea · pristine membrane · steady CVVHD · zero net UF',developmentData:'Hematica · in-vitro CVVHD experiments',filterPreset:$('filterPreset').value,properties:readDesign(),geometryProvenance:C.geometryProfile(D,geometryOrigin,readDesign()),hydraulicProvenance:C.hydraulicProfile(D,geometryOrigin,readDesign(),activeHydraulicProfileId),result:last,transportMetrics:T.fromResult(last),manufacturerKoaComparison:updateKoaComparison(),filterComparison:lastComparison?{filterId:lastComparison.filterId,properties:lastComparison.properties,result:lastComparison.result}:null},null,2));}));
 $('applyWaterProfile').addEventListener('click',safe(()=>{const p={...D.designDefaults};document.querySelectorAll('[data-property]').forEach(e=>p[e.dataset.property]=e.tagName==='SELECT'?e.value:e.value===''?NaN:Number(e.value));const next=C.applyWaterProfile(D,p,$('waterProfile').value,$('waterProfileBasis').value);for(const key of ['Lp','hydraulicMode','hydraulicBasis','darcy_m2'])$('design_'+key).value=next[key];activeHydraulicProfileId=$('waterProfile').value;$('filterPreset').value='custom';set('presetNotes','Research water-measurement profile applied. Review model/geometry/temperature compatibility in Hydraulic input details.');updateStatic();}));
 document.querySelectorAll('[data-property]').forEach(e=>e.value=D.designDefaults[e.dataset.property]);initCatalog();setMode('standard');safe(applyPreset)();
 
 
+function chooseTransportModel(model){
+ $('modelChooser').hidden=model!==null;
+ $('changeModel').hidden=model===null;
+ $('fibreWorkspace').hidden=model!=='fibre';
+ $('bundleWorkspace').hidden=model!=='bundle';
+ $('status').hidden=true;
+}
+$('chooseFibre').addEventListener('click',()=>chooseTransportModel('fibre'));
+$('chooseBundle').addEventListener('click',()=>chooseTransportModel('bundle'));
+$('changeModel').addEventListener('click',()=>chooseTransportModel(null));
+let bundleCalibration=null;
+const bundleForm=$('bundleForm');
+function clearBundleResult(){
+ $('bundleResults').replaceChildren();
+ $('bundleChart').replaceChildren();
+}
+$('bundleFile').addEventListener('change',async event=>{
+ const file=event.target.files[0];
+ bundleCalibration=null;
+ clearBundleResult();
+ if(!file){set('bundleStatus','Choose a calibration Markdown file.');return;}
+ try{
+  const data=window.DialyzerHomogenized.calibrationFromMarkdown(await file.text());
+  if(event.target.files[0]!==file)return;
+  bundleCalibration=data;
+  bundleForm.elements.shellK.value=data.shellK;
+  bundleForm.elements.area.value=data.areaDensity*Math.PI*.02**2*.241;
+  set('bundleStatus','Six CFD calibration points loaded. Exchange area initialised from the CFD mesh-corrected area density. The axial dialysate permeability is a provisional bundle coefficient.');
+ }catch(error){
+  if(event.target.files[0]===file)set('bundleStatus',error.message);
+ }
+});
+bundleForm.addEventListener('submit',event=>{
+ event.preventDefault();
+ clearBundleResult();
+ if(!bundleCalibration){set('bundleStatus','Load the Phylther HF 17SD calibration Markdown first.');return;}
+ const p=Object.fromEntries([...new FormData(bundleForm)].map(([key,value])=>[key,Number(value)]));
+ const solve=(uf,qd)=>window.DialyzerHomogenized.predict({...p,uf,qd},bundleCalibration);
+ const modes=[p.uf,p.uf===0?10:0];
+ const value=x=>x===null?'—':f(x,3);
+ tableRows('bundleResults',modes.map(uf=>{
+  try{
+   const r=solve(uf,p.qd);
+   return [uf,value(r.clearance),r.radd===null?'∞':r.radd.toExponential(6),r.rm===null?'∞':r.rm.toExponential(6),value(r.forward)+' / '+value(r.back),r.anchor?value(r.anchor[3]):'—'];
+  }catch(error){return [uf,error.message,'—','—','—','—'];}
+ }));
+ const maxQd=Math.max(1000,p.qd), flows=[...new Set([...Array.from({length:51},(_,i)=>maxQd*i/50),500,p.qd])].sort((a,b)=>a-b);
+ const curves=modes.map(uf=>flows.map(qd=>{
+  try{return [qd,solve(uf,qd).clearance];}catch{return [qd,null];}
+ }));
+ chart('bundleChart',curves[0],[],{split:p.qd,secondary:curves[1],yLabel:'Urea clearance · mL/min'});
+ set('bundleStatus','White: UF '+modes[0]+' · pink: UF '+modes[1]+' mL/min. CFD values in the table refer to the reference geometry. '+(p.qd===500&&p.qb>=200&&p.qb<=400?'Geometry changes transfer the reference calibration as an exploratory assumption.':'Exploratory flow conditions outside the calibration line.'));
+});
