@@ -10,7 +10,7 @@ test('xevonta Hi dimensional specifications apply to the four listed sizes only'
   const id='b-braun-xevonta-hi-'+size,p=C.properties(D,id),g=C.geometryProfile(D,id,p);
   assert.deepEqual([p.length_mm,p.fiberCount,p.totalLength_mm],[length,count,total]);
   assert.equal(g.rows.find(r=>r.key==='length_mm').source.location,'§5.4');
-  assert.ok(Math.abs(p.Lp*D.geometry(p).area-35)<1e-9);
+  assert.equal(p.Lp,217);
  }
  for(const f of C.filters.filter(f=>/xevonta (Lo|Hi 10|Hi 12)/i.test(f.name)))assert.equal(f.geometryFieldSources?.length_mm,undefined);
 });

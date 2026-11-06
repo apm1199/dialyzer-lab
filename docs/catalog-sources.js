@@ -8,6 +8,11 @@ for(const [size,L,N,bore,total]of [[13,246,8600,36.75,306],[15,246,9900,36.75,30
 for(const [size,N]of [[140,7500],[170,9300],[210,12000]])record('baxter-polyflux-'+size+'-h',{length_mm:270,fiberCount:N},clearum,'Polyflux H active length and counts are reported for the predicate in FDA K193542, with 215 µm bore. The older K030592 submission states approximately 200 µm: do not silently combine editions. Current catalog bore is retained.');
 for(const [size,N]of [[13,8800],[16,10840],[19,12870]])record('b-braun-diacap-pro-'+size+'h',{length_mm:235,fiberCount:N},diacap,'Mean free fibre length and mean fibre count are reported specifically for Diacap Pro 13H/16H/19H in FDA K170574. No length is transferred to Pro 08H, Pro L, acute or other families.');
 for(const [size,N]of [[400,12960],[500,15120]])record('baxter-theranova-'+size,{length_mm:236,fiberCount:N,totalLength_mm:260},theranova,'Effective length and count are reported in the original Theranova 400/500 study, Table 1. Effective length excludes potting. This geometry evidence is separate from manufacturer clearance comparison data.');
+for(const size of [10,12]){
+ const filter=C.find('b-braun-xevonta-hi-'+size);
+ filter.material='amembris polysulfone';
+ filter.notes.push('B. Braun Dialog iQ technical catalogue identifies the Hi 10 and Hi 12 membranes as amembris.');
+}
 const xevontaHi={label:'B. Braun xevonta Hi dimensional specification',location:'§5.4'};
 for(const [size,length_mm,fiberCount,totalLength_mm] of [[15,237,10750,300],[18,277,10750,340],[20,277,12250,340],[23,277,13820,340]]){
  record('b-braun-xevonta-hi-'+size,{length_mm,fiberCount,totalLength_mm},xevontaHi,'Effective fibre length ±5 mm, fibre count ±1.5%, and module length without protective caps ±2 mm. The nominal area is separate from the model area calculated from fibre geometry.');
