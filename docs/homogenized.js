@@ -22,20 +22,25 @@ function catalogPreset(C,D,id){
 }
 function predict(p,cal=calibration,cells=240){
  const {qb,qd,uf,area,fibres,bore,wall,housing,length,caseLength,lp,shellK}=p;
- requireValue(Object.values(p).every(Number.isFinite)&&[0,10].includes(uf)&&qb>uf&&qd>=0&&[area,fibres,bore,wall,housing,length,lp,shellK].every(x=>x>0)&&Number.isInteger(fibres)&&(caseLength===0||caseLength>=length),'Enter positive geometry and hydraulic properties, Qb > UF, Qd ≥ 0 and, if supplied, an overall length at least as large as active length.');
+ requireValue(Object.values(p).every(Number.isFinite)&&uf>=0&&qb>uf&&qd>=0&&[area,fibres,bore,wall,housing,length,lp,shellK].every(x=>x>0)&&Number.isInteger(fibres)&&(caseLength===0||caseLength>=length),'Enter positive geometry and hydraulic properties, 0 ≤ UF < Qb, Qd ≥ 0 and, if supplied, an overall length at least as large as active length.');
  const ri=bore*5e-7,ro=ri+wall*1e-6,R=housing/2000,L=length/1000,S=Math.PI*R*R;
  const eb=fibres*(ri/R)**2,ed=1-fibres*(ro/R)**2;
  requireValue(eb>0&&ed>0,'The fibres do not fit inside the housing.');
  const geometricArea=fibres*2*Math.PI*ri*L;
  const activeArea=area;
  const intrinsic=ri*Math.log(ro/ri)/DM;
- const branch=cal.rows.filter(r=>r[0]===uf).sort((a,b)=>a[1]-b[1]);
- const nodes=branch.map(r=>r[1]), referenceRadd=M.interpolate(nodes,branch.map(r=>r[2]),Math.min(nodes.at(-1),Math.max(nodes[0],qb)));
+ const weight=Math.min(uf/10,1);
+ const branchResistance=[0,10].map(anchorUf=>{
+  const branch=cal.rows.filter(r=>r[0]===anchorUf).sort((a,b)=>a[1]-b[1]);
+  const nodes=branch.map(r=>r[1]);
+  return M.interpolate(nodes,branch.map(r=>r[2]),Math.min(nodes.at(-1),Math.max(nodes[0],qb)));
+ });
+ const referenceRadd=(1-weight)*branchResistance[0]+weight*branchResistance[1];
  const at500=1/(intrinsic+referenceRadd), limit=1/intrinsic;
  // Two-knot PCHIP is linear. Match its terminal slope to an exponential tail.
  const permeance=qd<=500?M.interpolate([0,500],[0,at500],qd):limit-(limit-at500)*Math.exp(-(qd-500)*at500/(500*(limit-at500)));
  const rm=permeance>0?1/permeance:null,radd=rm===null?null:rm-intrinsic;
- const result={rm,radd,referenceRadd,geometricArea,activeArea,eb,ed,areaDensity:activeArea/(S*L),diffusivePermeance:permeance,anchor:branch.find(r=>r[1]===qb&&qd===500)||null};
+ const result={rm,radd,referenceRadd,geometricArea,activeArea,eb,ed,areaDensity:activeArea/(S*L),diffusivePermeance:permeance,anchor:cal.rows.find(r=>r[0]===uf&&r[1]===qb&&qd===500)||null};
  if(qd===0&&uf===0)return {...result,clearance:0,forward:null,back:null};
  const cbResistance=MU/(eb*ri*ri/8*S),cdResistance=MU/(shellK*S);
  const exchange=lp*1e-6/3600/MMHG*activeArea/L;

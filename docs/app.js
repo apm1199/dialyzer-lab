@@ -131,21 +131,11 @@ $('chartMetric').addEventListener('change',safe(updateStatic));$('filterPreset')
 $('validationFilter').addEventListener('change',safe(()=>{validationKey=null;updateValidation();}));
 $('resetResearch').addEventListener('click',safe(()=>{const defaults=C.find(geometryOrigin)?C.properties(D,geometryOrigin):D.designDefaults;document.querySelectorAll('[data-property]').forEach(e=>{if(!primaryKeys.includes(e.dataset.property))e.value=e.type==='number'&&!Number.isFinite(defaults[e.dataset.property])?'':defaults[e.dataset.property];});updateStatic();}));
 $('resetDesign').addEventListener('click',safe(()=>{document.querySelectorAll('[data-property]').forEach(e=>e.value=D.designDefaults[e.dataset.property]);$('useFiberCount').checked=false;$('filterPreset').value='reference';geometryOrigin='reference';activeHydraulicProfileId=null;set('presetNotes','Design settings restored · assumed module internal diameter 40 mm.');updateStatic();}));
-$('export').addEventListener('click',safe(()=>{updateStatic();download('dialyzer-result.json',JSON.stringify({version:'0.11.1',created:new Date().toISOString(),scope:'Urea · pristine membrane · steady CVVHD · zero net UF',developmentData:'Hematica · in-vitro CVVHD experiments',filterPreset:$('filterPreset').value,properties:readDesign(),geometryProvenance:C.geometryProfile(D,geometryOrigin,readDesign()),hydraulicProvenance:C.hydraulicProfile(D,geometryOrigin,readDesign(),activeHydraulicProfileId),result:last,transportMetrics:T.fromResult(last),manufacturerKoaComparison:updateKoaComparison(),filterComparison:lastComparison?{filterId:lastComparison.filterId,properties:lastComparison.properties,result:lastComparison.result}:null},null,2));}));
+$('export').addEventListener('click',safe(()=>{updateStatic();download('dialyzer-result.json',JSON.stringify({version:'0.11.2',created:new Date().toISOString(),scope:'Urea · pristine membrane · steady CVVHD · zero net UF',developmentData:'Hematica · in-vitro CVVHD experiments',filterPreset:$('filterPreset').value,properties:readDesign(),geometryProvenance:C.geometryProfile(D,geometryOrigin,readDesign()),hydraulicProvenance:C.hydraulicProfile(D,geometryOrigin,readDesign(),activeHydraulicProfileId),result:last,transportMetrics:T.fromResult(last),manufacturerKoaComparison:updateKoaComparison(),filterComparison:lastComparison?{filterId:lastComparison.filterId,properties:lastComparison.properties,result:lastComparison.result}:null},null,2));}));
 $('applyWaterProfile').addEventListener('click',safe(()=>{const p={...D.designDefaults};document.querySelectorAll('[data-property]').forEach(e=>p[e.dataset.property]=e.tagName==='SELECT'?e.value:e.value===''?NaN:Number(e.value));const next=C.applyWaterProfile(D,p,$('waterProfile').value,$('waterProfileBasis').value);for(const key of ['Lp','hydraulicMode','hydraulicBasis','darcy_m2'])$('design_'+key).value=next[key];activeHydraulicProfileId=$('waterProfile').value;$('filterPreset').value='custom';set('presetNotes','Research water-measurement profile applied. Review model/geometry/temperature compatibility in Hydraulic input details.');updateStatic();}));
 document.querySelectorAll('[data-property]').forEach(e=>e.value=D.designDefaults[e.dataset.property]);initCatalog();setMode('standard');safe(applyPreset)();
 
 
-function chooseTransportModel(model){
- $('modelChooser').hidden=model!==null;
- $('changeModel').hidden=model===null;
- $('fibreWorkspace').hidden=model!=='fibre';
- $('bundleWorkspace').hidden=model!=='bundle';
- $('status').hidden=true;
-}
-$('chooseFibre').addEventListener('click',()=>chooseTransportModel('fibre'));
-$('chooseBundle').addEventListener('click',()=>{chooseTransportModel('bundle');bundleForm.requestSubmit();});
-$('changeModel').addEventListener('click',()=>chooseTransportModel(null));
 const H=window.DialyzerHomogenized,bundleForm=$('bundleForm'),bundlePreset=$('bundlePreset');
 bundlePreset.add(new Option('Phylther HF 17SD · CFD reference','bundle-reference'));
 bundlePreset.add(new Option('Custom geometry','custom'));
@@ -177,6 +167,26 @@ bundlePreset.addEventListener('change',()=>{
  loadBundlePreset();
  if(bundleForm.checkValidity())bundleForm.requestSubmit();
 });
+$('transportModel').addEventListener('change',()=>{
+ const bundle=$('transportModel').value==='bundle';
+ $('fibreWorkspace').hidden=bundle;
+ $('bundleWorkspace').hidden=!bundle;
+ $('status').hidden=true;
+ const id=bundle?$('filterPreset').value:bundlePreset.value;
+ if(id!=='reference'&&C.find(id)){
+  if(bundle){
+   if(bundlePreset.value!==id){bundlePreset.value=id;loadBundlePreset();}
+   bundleForm.elements.qb.value=$('design_feedFlow_mLmin').value;
+   bundleForm.elements.qd.value=$('qd').value;
+  }else{
+   $('qd').value=bundleForm.elements.qd.value;
+   $('design_feedFlow_mLmin').value=bundleForm.elements.qb.value;
+   if($('filterPreset').value!==id){$('filterPreset').value=id;safe(applyPreset)();}
+   else safe(updateStatic)();
+  }
+ }
+ if(bundle&&bundleForm.checkValidity())bundleForm.requestSubmit();
+});
 bundleForm.addEventListener('submit',event=>{
  event.preventDefault();
  clearBundleResult();
@@ -184,6 +194,7 @@ bundleForm.addEventListener('submit',event=>{
  const solve=(uf,qd)=>H.predict({...p,uf,qd});
  const isReference=Object.entries(H.referencePreset).every(([key,value])=>p[key]===value);
  const modes=[p.uf,p.uf===0?10:0];
+ const ufNote=p.uf>10?' Above the UF calibration range: using the UF 10 resistance.':p.uf>0&&p.uf<10?' Resistance interpolated between UF 0 and UF 10.':'';
  const value=x=>x===null?'—':f(x,3);
  tableRows('bundleResults',modes.map(uf=>{
   try{
@@ -196,5 +207,5 @@ bundleForm.addEventListener('submit',event=>{
   try{return [qd,solve(uf,qd).clearance];}catch{return [qd,null];}
  }));
  chart('bundleChart',curves[0],[],{split:p.qd,secondary:curves[1],yLabel:'Urea clearance · mL/min'});
- set('bundleStatus','White: UF '+modes[0]+' · pink: UF '+modes[1]+' mL/min. CFD values in the table refer to the reference geometry. '+(p.qd===500&&p.qb>=200&&p.qb<=400?'Geometry changes transfer the reference calibration as an exploratory assumption.':'Exploratory flow conditions outside the calibration line.'));
+ set('bundleStatus','White: UF '+modes[0]+' · pink: UF '+modes[1]+' mL/min. CFD values in the table refer to the reference geometry. '+(p.qd===500&&p.qb>=200&&p.qb<=400?'Geometry changes transfer the reference calibration as an exploratory assumption.':'Exploratory flow conditions outside the calibration line.')+ufNote);
 });
