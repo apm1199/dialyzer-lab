@@ -1,7 +1,22 @@
 'use strict';
 const D=window.DialyzerDesign,M=window.DialyzerModel,V=window.DialyzerChecks,C=window.DialyzerCatalog,$=id=>document.getElementById(id);
 let last=null,lastComparison=null,mode='standard',validationKey=null,validationAxis='qb',geometryOrigin='reference',activeHydraulicProfileId=null;
-const filterStatuses=window.DialyzerFilterStatus.build(C,D),T=window.DialyzerTransportMetrics;
+const T=window.DialyzerTransportMetrics;
+const statusByModel={fibre:window.DialyzerFilterStatus.build(C,D)};
+let filterStatuses=statusByModel.fibre;
+function predictCalibration(model,p,fluid,qd,cin=.885,uf=0){
+ if(model==='fibre')return D.predict(p,fluid,qd,cin);
+ if(!Number.isFinite(uf)||uf<0)throw Error('Enter a nonnegative net ultrafiltration flow.');
+ return D.predict(p,fluid,qd,cin,{uf,resistance:window.DialyzerHomogenized.resistance(p.feedFlow_mLmin,qd,uf)});
+}
+function refreshCalibrationAudit(){
+ const model=$('transportModel').value;
+ filterStatuses=statusByModel[model]??=window.DialyzerFilterStatus.build(C,{
+  ...D,predict:(p,fluid,qd)=>predictCalibration(model,p,fluid,qd)
+ });
+ decorateFilterMenus();
+ updateHydraulicAudit();
+}
 function syncSelectedFilterStyles(){for(const id of ['filterPreset','comparisonFilter','validationFilter']){const select=$(id),status=filterStatuses[select.value];select.dataset.auditState=status?.state||'unassessed';select.title=status?`${status.label}; ${status.within}/${status.total} points within ±10%; ${status.missing} not calculable. Catalog preset audit.`:'Reference or custom case; no manufacturer audit classification.';}}
 function decorateFilterMenus(){for(const id of ['filterPreset','comparisonFilter','validationFilter'])for(const option of $(id).options){const status=filterStatuses[option.value];if(!status)continue;if(!option.dataset.baseLabel)option.dataset.baseLabel=option.textContent;option.textContent=status.marker+option.dataset.baseLabel+' · '+status.label;option.style.color=status.color;option.dataset.auditState=status.state;option.title=`${status.within}/${status.total} points within ±10%; ${status.missing} not calculable. Catalog defaults, water, zero net UF.`;}syncSelectedFilterStyles();}
 
@@ -46,9 +61,7 @@ for(const id of ['transportDapp','transportRadd'])$(id).addEventListener('focus'
 function updateTransportMetrics(result){const m=T.fromResult(result);$('transportDapp').value=m.apparentMembraneDiffusivity_m2_s?.toExponential(12)??'';$('transportRadd').value=m.additionalSoluteResistance_s_m?.toExponential(12)??(result.qd===0?'∞':'');for(const [id,key]of [['transportGross','grossFiltration_mLmin'],['transportBack','backfiltration_mLmin'],['transportNet','netUltrafiltration_mLmin']])set(id,m[key]===null?'N/A':f(m[key])+' mL/min');set('transportKoa',f(m.equivalentKoa_mLmin)+' mL/min');for(const [id,key]of [['transportNtu','ntu'],['transportEffectiveness','effectiveness'],['transportExtraction','extraction'],['transportRatio','capacityRatio']])set(id,m[key]===null?'N/A':f(m[key],4));set('transportPe',m.barrierPe?f(m.barrierPe.min,4)+' / '+f(m.barrierPe.max,4):'N/A · zero dialysate flow');if(m.barrierPe)chart('transportPeChart',result.hydraulics.x_m.map((x,i)=>[x*1000,m.barrierPe.values[i]]),[],{xLabel:'Axial position x · mm',yLabel:'Signed equivalent-barrier Pe'});else $('transportPeChart').replaceChildren(document.createTextNode('No local transport calculation at Qd = 0.'));updateKoaComparison();}
 function usesBundleCalibration(){return $('transportModel').value==='bundle';}
 function predictDesign(p,fluid,qd,cin,uf=usesBundleCalibration()?$('bundleUf').valueAsNumber:0){
- if(!usesBundleCalibration())return D.predict(p,fluid,qd,cin);
- if(!Number.isFinite(uf)||uf<0)throw Error('Enter a nonnegative net ultrafiltration flow.');
- return D.predict(p,fluid,qd,cin,{uf,resistance:window.DialyzerHomogenized.resistance(p.feedFlow_mLmin,qd,uf)});
+ return predictCalibration($('transportModel').value,p,fluid,qd,cin,uf);
 }
 function updateStatic(){updateControls();syncSelectedFilterStyles();const p=readDesign(),qd=Number($('qd').value),cin=Number($('cin').value),fluid=$('fluid').value;syncFlow();const result=predictDesign(p,fluid,qd,cin);last=result;updateTransportMetrics(result);
  set('k',f(result.kWater));set('ff',result.filtrationFractionPct===null?'N/A':f(result.filtrationFractionPct));set('kbulk',f(result.kBulk));set('koa',f(result.koa,1)+' mL/min');set('removal',f(result.removal_mgmin)+' mg/min');set('cb',f(result.cBulkOut,4)+' kg/m³');set('cd',result.cDialysateOut===null?'N/A · no effluent':f(result.cDialysateOut,4)+' kg/m³');set('qw',f(result.qw)+' mL/min');set('sourceTag',usesBundleCalibration()?'PHYLTHER HF 17SD · CFD RESISTANCE':'HEMATICA · IN-VITRO CVVHD');
@@ -80,11 +93,57 @@ function updateDesignComparison(p,fluid,qd,cin,qValues){lastComparison=null;$('c
  try{const c=V.designComparison({...D,predict:predictDesign},C,p,$('comparisonFilter').value,fluid,qd,cin,qValues),filter=C.find(c.filterId),isFF=$('chartMetric').value==='filtration',a=isFF?last.filtrationFractionPct:last.kWater,b=isFF?c.result.filtrationFractionPct:c.result.kWater,unit=isFF?'%':'mL/min';set('comparisonResult',a===null||b===null?'Filtration fraction is unavailable at Qd = 0.':`At Qd = ${f(qd)} mL/min: Filter A ${f(a)} ${unit} · Filter B ${f(b)} ${unit}. ${a>0?'B versus A: '+f(100*(b/a-1))+'%.':''}`);const g=D.geometry(c.properties);set('comparisonDetails',`Filter B: ${filter.manufacturer} ${filter.name}. Same ${fluid} properties and Qb = ${f(p.feedFlow_mLmin)} mL/min; net UF = ${f(last.netUF)} mL/min. Area ${f(g.area,3)} m²; ${f(g.nf,0)} fibres (${filter.properties.fiberCount?'source-reported count':'derived count'}; active length ${filter.id==='reference'?'reference geometry':filter.properties.length_mm?'documented':'assumed'}). `+presetDescription(filter));lastComparison=c;return c;}catch(e){set('comparisonResult','Second filter could not be calculated: '+e.message);set('comparisonDetails','Primary result unchanged.');return null;}}
 
 function updateReference(){const d=M.presets[$('fluid').value];set('datasetName',d.name);tableRows('dataRows',d.rows.map(([q,k])=>{const r=M.predict(d,q);return[f(q),f(k),f(r.kWater),f(r.koa,1)];}));const cv=M.crossValidate(d);set('cv',`Held-out RMSE: ${f(cv.rmse,3)} mL/min. Internal reduction check; not independent experimental validation.`);tableRows('cvRows',cv.points.map(r=>[f(r.qd),f(r.observed),f(r.predicted),f(r.error,3)]));set('lowCheck',d.fluid==='water'?`Non-fitted numerical check at Qd = 5: reduced prediction ${f(M.predict(d,5).kWater,3)} mL/min versus approximately 4.66 mL/min. This compares numerical models.`:'The blood reference response begins at Qd = 41.67 mL/min and is numerical, not experimental blood validation.');}
-function updateValidation(){syncSelectedFilterStyles();const key=$('validationFilter').value,filter=C.find(key);if(!filter||!C.comparable(filter).length)throw Error('Select an aqueous zero-UF comparison dataset.');const benchmarks=C.comparable(filter),qds=[...new Set(benchmarks.map(b=>b.qd))].sort((a,b)=>a-b),qbs=[...new Set(benchmarks.map(b=>b.qb))].sort((a,b)=>a-b);validationAxis=qbs.length===1&&qds.length>1?'qd':'qb';const versusQd=validationAxis==='qd',fixedFlows=versusQd?qbs:qds;
- if(validationKey!==key)$('validationQd').replaceChildren(...fixedFlows.map(q=>{const o=document.createElement('option');o.value=q;o.textContent=q+' mL/min';return o;}));validationKey=key;$('validationQdLabel').hidden=fixedFlows.length<2;set('validationFlowLabel',versusQd?'Manufacturer test inlet flow Qb':'Manufacturer test dialysate flow Qd');const fixed=Number($('validationQd').value),selected=benchmarks.filter(b=>(versusQd?b.qb:b.qd)===fixed).sort((a,b)=>(versusQd?a.qd-b.qd:a.qb-b.qb)),rows=selected.map(b=>{try{return {...b,predicted:predictDesign(C.properties(D,key,b.qb),'water',b.qd,.885,0).kWater};}catch(e){return {...b,predicted:null,error:e.message};}});if(!rows.length)throw Error('No matching comparison points.');const min=Math.min(...rows.map(r=>versusQd?r.qd:r.qb)),max=Math.max(...rows.map(r=>versusQd?r.qd:r.qb)),curve=Array.from({length:max===min?1:41},(_,i)=>{const x=min+(max-min)*i/40;try{return[x,predictDesign(C.properties(D,key,versusQd?fixed:x),'water',versusQd?x:fixed,.885,0).kWater];}catch(e){return[x,null];}});
- chart('validationChart',curve,rows.map(r=>[versusQd?r.qd:r.qb,r.k,r.lower,r.upper,r.uncertaintyKind]),{xLabel:versusQd?'Dialysate flow Qd · mL/min':'Feed flow Qb · mL/min'});tableRows('validationRows',rows.map(r=>[f(r.qb,0),f(r.qd,0),r.predicted===null?'Not calculable: '+r.error:f(r.predicted),`${f(r.k)} [${f(r.lower)}–${f(r.upper)}]`,r.predicted===null?'N/A':f(100*(r.predicted/r.k-1))]));set('validationChartHeading',versusQd?'Clearance versus dialysate flow':'Clearance versus feed flow');set('validationPointLabel',' Manufacturer · comparison bands');set('validationBadge','AQUEOUS · CVVHD · ZERO NET UF');set('validationConditions',`${filter.manufacturer} ${filter.name} · manufacturer test: ${filter.protocol.clearanceTestFluid} · Qd = ${[...new Set(rows.map(r=>r.qd))].join(', ')} mL/min · Qb = ${[...new Set(rows.map(r=>r.qb))].join(', ')} mL/min · QF = 0. Model calculation: water, urea, CVVHD with zero net UF. Zero-net-UF points use water under the project convention.`);
+function updateValidation(){
+ syncSelectedFilterStyles();
+ const key=$('validationFilter').value,filter=C.find(key);
+ if(!filter||!C.comparable(filter).length)throw Error('Select an aqueous zero-UF comparison dataset.');
+ const benchmarks=C.comparable(filter);
+ const qds=[...new Set(benchmarks.map(b=>b.qd))].sort((a,b)=>a-b);
+ const qbs=[...new Set(benchmarks.map(b=>b.qb))].sort((a,b)=>a-b);
+ const versusQd=qbs.length===1&&qds.length>1;
+ validationAxis=versusQd?'qd':'qb';
+ const fixedFlows=versusQd?qbs:qds;
+ if(validationKey!==key)$('validationQd').replaceChildren(...fixedFlows.map(q=>new Option(q+' mL/min',q)));
+ validationKey=key;
+ $('validationQdLabel').hidden=fixedFlows.length<2;
+ set('validationFlowLabel',versusQd?'Manufacturer test inlet flow Qb':'Manufacturer test dialysate flow Qd');
+ const fixed=Number($('validationQd').value);
+ const selected=benchmarks.filter(b=>(versusQd?b.qb:b.qd)===fixed).sort((a,b)=>a[validationAxis]-b[validationAxis]);
+ if(!selected.length)throw Error('No matching comparison points.');
+ const active=$('transportModel').value,alternate=active==='fibre'?'bundle':'fibre';
+ const names={fibre:'Equivalent fibre',bundle:'Homogenized'};
+ function evaluate(model,qb,qd){
+  try{return predictCalibration(model,C.properties(D,key,qb),'water',qd).kWater;}
+  catch{return null;}
+ }
+ const rows=selected.map(b=>({...b,predicted:evaluate(active,b.qb,b.qd),alternate:evaluate(alternate,b.qb,b.qd)}));
+ const min=rows[0][validationAxis],max=rows.at(-1)[validationAxis];
+ const curve=model=>Array.from({length:min===max?1:41},(_,i)=>{
+  const x=min+(max-min)*i/40;
+  return [x,evaluate(model,versusQd?fixed:x,versusQd?x:fixed)];
+ });
+ chart('validationChart',curve(active),rows.map(r=>[r[validationAxis],r.k,r.lower,r.upper,r.uncertaintyKind]),{
+  xLabel:versusQd?'Dialysate flow Qd · mL/min':'Feed flow Qb · mL/min',secondary:curve(alternate)
+ });
+ const cell=(predicted,observed)=>predicted===null?'Not calculable':f(predicted)+' ('+f(100*(predicted/observed-1))+'%)';
+ tableRows('validationRows',rows.map(r=>[f(r.qb,0),f(r.qd,0),f(r.k)+' ['+f(r.lower)+'–'+f(r.upper)+']',cell(r.predicted,r.k),cell(r.alternate,r.k)]));
+ set('validationActiveHeader',names[active]+' · mL/min (error %)');
+ set('validationAlternateHeader',names[alternate]+' · mL/min (error %)');
+ set('validationCurveLegend','White · '+names[active]+' / Pink · '+names[alternate]);
+ set('validationChartHeading',versusQd?'Clearance versus dialysate flow':'Clearance versus feed flow');
+ set('validationPointLabel',' Manufacturer · comparison bands');
+ set('validationBadge','AQUEOUS · ZERO NET UF');
+ set('validationConditions',filter.manufacturer+' '+filter.name+' · manufacturer test and both predictions at matched flows, water model and zero net UF.');
+
  const source=filter.protocol.verifiedClearanceSource||{medium:filter.protocol.clearanceTestFluid||'not reported',label:filter.source.file,page:filter.source.page,url:filter.source.url};const sourceText=document.createTextNode('Clearance-test medium: '+source.medium+'; QF = 0. '+source.label+(source.page?' · p. '+source.page:''));$('validationProtocolSource').replaceChildren(sourceText);if(source.url){const link=document.createElement('a');link.href=source.url;link.target='_blank';link.rel='noopener noreferrer';link.textContent=' Source ↗';$('validationProtocolSource').append(link);}
- set('uncertaintyNote','White whiskers: manufacturer-reported tolerances. Red whiskers: assumed ±10% comparison bands. Neither is a statistical confidence interval.');const p=C.properties(D,key,rows[0].qb),gp=C.geometryProfile(D,key,p);set('validationAssumptions',gp.rows.map(r=>r.label+': '+(r.value===null?'not supplied':f(r.value,r.key==='fiberCount'?0:3)+' '+r.unit)+' ['+r.state+']').join('; ')+'. '+gp.warning+' '+presetDescription(filter)+' Protocol: '+(filter.protocol.evidence||[]).map(e=>e.file+' · p. '+e.page).join('; '));const valid=rows.filter(r=>Number.isFinite(r.predicted)),rmse=valid.length?Math.sqrt(valid.reduce((v,r)=>v+(r.predicted-r.k)**2,0)/valid.length):null;set('validationSummary',`${rows.length} aqueous zero-UF comparison points · ${valid.length} calculable · ${valid.filter(r=>Math.abs(100*(r.predicted/r.k-1))<=10).length}/${valid.length} calculated points within ±10% · ${rows.length-valid.length} not calculable. ${valid.length?'Maximum absolute difference '+f(Math.max(...valid.map(r=>Math.abs(100*(r.predicted/r.k-1)))))+'% · RMSE '+f(rmse)+' mL/min. ':''}Module internal diameter: 40 mm assumed unless documented otherwise. Missing physical inputs use reference assumptions; no fitting to manufacturer clearances.`);$('externalValidationNotes').hidden=true;}
+ set('uncertaintyNote','White whiskers: manufacturer-reported tolerances. Red whiskers: assumed ±10% comparison bands. Neither is a statistical confidence interval.');const p=C.properties(D,key,rows[0].qb),gp=C.geometryProfile(D,key,p);set('validationAssumptions',gp.rows.map(r=>r.label+': '+(r.value===null?'not supplied':f(r.value,r.key==='fiberCount'?0:3)+' '+r.unit)+' ['+r.state+']').join('; ')+'. '+gp.warning+' '+presetDescription(filter)+' Protocol: '+(filter.protocol.evidence||[]).map(e=>e.file+' · p. '+e.page).join('; '));const summary=(name,field)=>{
+ const valid=rows.filter(r=>Number.isFinite(r[field]));
+ const within=valid.filter(r=>Math.abs(100*(r[field]/r.k-1))<=10).length;
+ const rmse=valid.length?Math.sqrt(valid.reduce((sum,r)=>sum+(r[field]-r.k)**2,0)/valid.length):null;
+ return name+': '+within+'/'+rows.length+' points within ±10%, '+(rows.length-valid.length)+' not calculable'+(rmse===null?'':', RMSE '+f(rmse)+' mL/min')+'.';
+ };
+ set('validationSummary',summary(names[active],'predicted')+' '+summary(names[alternate],'alternate'));
+ $('externalValidationNotes').hidden=true;}
 
 function presetDescription(filter){if(filter.id==='reference')return 'Historical reference reconstruction: Lp32 is an implemented assumption, not an independently verified pristine-water measurement. HF1000 fibre and membrane reference properties; a 40 mm internal module diameter is assumed for design calculations. Original calibration geometry is retained internally. Calibration data were provided by Hematica in in-vitro CVVHD experiments.';const labels={area_m2:'area',length_mm:'fibre length',diameter_um:'inner diameter',thickness_um:'wall thickness',Lp:'hydraulic permeability',sharedModuleConductance:'shared 35 mL/(h·mmHg) module conductance',porosity:'porosity',tortuosity:'tortuosity',packing:'packing',shellDiameter_mm:'module internal diameter (40 mm assumed)',membraneDiffusivity:'pore-fluid diffusivity',hindrance:'hindrance'};return `${filter.material}. Source: ${filter.source.file}${filter.source.page?' · p. '+filter.source.page:''}. Reference assumptions retained for: ${C.assumptions(filter).map(k=>labels[k]||k).join(', ')||'none'}. ${filter.properties.fiberCount?'Fibre count supplied.':'Fibre count derived from area, diameter and fibre length.'} ${filter.notes.join(' ')}`;}
 function populatePresets(){const select=$('filterPreset'),before=select.value;select.replaceChildren();
@@ -137,13 +196,15 @@ $('chartMetric').addEventListener('change',safe(updateStatic));$('filterPreset')
 $('validationFilter').addEventListener('change',safe(()=>{validationKey=null;updateValidation();}));
 $('resetResearch').addEventListener('click',safe(()=>{const defaults=C.find(geometryOrigin)?C.properties(D,geometryOrigin):D.designDefaults;document.querySelectorAll('[data-property]').forEach(e=>{if(!primaryKeys.includes(e.dataset.property))e.value=e.type==='number'&&!Number.isFinite(defaults[e.dataset.property])?'':defaults[e.dataset.property];});updateStatic();}));
 $('resetDesign').addEventListener('click',safe(()=>{document.querySelectorAll('[data-property]').forEach(e=>e.value=D.designDefaults[e.dataset.property]);$('useFiberCount').checked=false;$('filterPreset').value='reference';geometryOrigin='reference';activeHydraulicProfileId=null;set('presetNotes','Design settings restored · assumed module internal diameter 40 mm.');updateStatic();}));
-$('export').addEventListener('click',safe(()=>{updateStatic();download('dialyzer-result.json',JSON.stringify({version:'0.11.3',created:new Date().toISOString(),scope:'Urea · pristine membrane · steady state',calibration:$('transportModel').value,netUF_mLmin:last.netUF,developmentData:'Hematica · in-vitro CVVHD experiments',filterPreset:$('filterPreset').value,properties:readDesign(),geometryProvenance:C.geometryProfile(D,geometryOrigin,readDesign()),hydraulicProvenance:C.hydraulicProfile(D,geometryOrigin,readDesign(),activeHydraulicProfileId),result:last,transportMetrics:T.fromResult(last),manufacturerKoaComparison:updateKoaComparison(),filterComparison:lastComparison?{filterId:lastComparison.filterId,properties:lastComparison.properties,result:lastComparison.result}:null},null,2));}));
+$('export').addEventListener('click',safe(()=>{updateStatic();download('dialyzer-result.json',JSON.stringify({version:'0.11.4',created:new Date().toISOString(),scope:'Urea · pristine membrane · steady state',calibration:$('transportModel').value,netUF_mLmin:last.netUF,developmentData:'Hematica · in-vitro CVVHD experiments',filterPreset:$('filterPreset').value,properties:readDesign(),geometryProvenance:C.geometryProfile(D,geometryOrigin,readDesign()),hydraulicProvenance:C.hydraulicProfile(D,geometryOrigin,readDesign(),activeHydraulicProfileId),result:last,transportMetrics:T.fromResult(last),manufacturerKoaComparison:updateKoaComparison(),filterComparison:lastComparison?{filterId:lastComparison.filterId,properties:lastComparison.properties,result:lastComparison.result}:null},null,2));}));
 $('applyWaterProfile').addEventListener('click',safe(()=>{const p={...D.designDefaults};document.querySelectorAll('[data-property]').forEach(e=>p[e.dataset.property]=e.tagName==='SELECT'?e.value:e.value===''?NaN:Number(e.value));const next=C.applyWaterProfile(D,p,$('waterProfile').value,$('waterProfileBasis').value);for(const key of ['Lp','hydraulicMode','hydraulicBasis','darcy_m2'])$('design_'+key).value=next[key];activeHydraulicProfileId=$('waterProfile').value;$('filterPreset').value='custom';set('presetNotes','Research water-measurement profile applied. Review model/geometry/temperature compatibility in Hydraulic input details.');updateStatic();}));
 document.querySelectorAll('[data-property]').forEach(e=>e.value=D.designDefaults[e.dataset.property]);initCatalog();setMode('standard');safe(applyPreset)();
 
 
 $('transportModel').addEventListener('change',safe(()=>{
  $('bundleUfControls').hidden=!usesBundleCalibration();
+ refreshCalibrationAudit();
+ if($('validationFilter').value)updateValidation();
  updateStatic();
 
 }));
