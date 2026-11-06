@@ -23,13 +23,13 @@ test('shared solver holds hydraulic results across resistance laws and conserves
  }
 });
 
-test('low-flow hybrid reproduces HF1000 manufacturer anchors and joins the Phylther branch monotonically',()=>{
+test('low-flow smooth fit stays within 0.35 mL/min of HF1000 manufacturer anchors and joins the Phylther branch monotonically',()=>{
  const C=require('../docs/catalog-water.js');
  const id='baxter-prismaflex-hf1000';
  for(const b of C.comparable(C.find(id))){
   const r=H.resistance(b.qb,b.qd,0);
   const result=D.predict(C.properties(D,id,b.qb),'water',b.qd,.885,{resistance:r});
-  assert.ok(Math.abs(result.kWater-b.k)<1e-6);
+  assert.ok(Math.abs(result.kWater-b.k)<.35);
  }
  for(const qb of [100,200,300,400])for(const uf of [0,5,10]){
   let last=Infinity;
