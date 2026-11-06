@@ -28,9 +28,9 @@ for(const [size,area_m2,length_mm,fiberCount,shellDiameter_mm,totalLength_mm,ure
    id,name:'Phylther HF '+size+' '+variant,manufacturer:'Bellco',category:'chronic-hd',
    material:'Polyphenylene H · '+(variant==='G'?'gamma sterilised':'moist-heat sterilised'),
    properties:{},source:{file:phylther.label,page:4,url:phylther.url},
-   notes:['The technical sheet lists HD, HF and HDF. The preset is available for numerical exploration. The zero-UF urea table follows EN1283 and reports common values for G and SD, but does not identify the clearance test fluid. These points are excluded from aqueous validation.'],
-   benchmarks:urea.map((k,i)=>({qb:200+100*i,qd:500,qf:0,k})),
-   protocol:{clearanceTestFluid:'unknown',requireAqueousClearanceEvidence:true}
+   notes:['The technical sheet lists HD, HF and HDF. The preset is available for numerical exploration. The zero-UF urea table follows EN 1283 and reports common values for G and SD. The test is classified as aqueous from the cited method; exact solution composition is unspecified.'],
+   benchmarks:urea.map((k,i)=>({qb:200+100*i,qd:500,qf:0,k,lower:k*.9,upper:k*1.1,uncertaintyKind:'assumed-comparison-band'})),
+   protocol:{clearanceTestFluid:'water',verifiedClearanceSource:{medium:'aqueous by EN 1283 (exact composition unspecified)',label:phylther.label,page:5,url:phylther.url}}
   });
   record(id,{area_m2,length_mm,fiberCount,shellDiameter_mm,totalLength_mm,diameter_um:200,thickness_um:30},phylther,'Uses effective fibre length and the minimum reported internal housing diameter as the equivalent bore. The nominal area is separate from the area calculated from fibre geometry.');
  }
