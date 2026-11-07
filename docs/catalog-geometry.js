@@ -4,8 +4,13 @@ const C=typeof module!=='undefined'&&module.exports?require('./catalog-sources.j
 const totalLengths={'medtronic-hcd-015':128,'medtronic-hcd-025':140,'medtronic-clearum-hs-13':306,'medtronic-clearum-hs-15':306,'medtronic-clearum-hs-17':306,'medtronic-clearum-hs-20':366,'medtronic-clearum-hs-22':366};
 const missingActiveLength=new Set(['medtronic-hcd-015','medtronic-hcd-025']);
 const theralite=C.find('baxter-theralite');if(theralite)theralite.modelRole='hollow-fibre-dialyzer';
+const xevontaModuleDiameter=42;
+for(const filter of C.filters.filter(f=>f.id.startsWith('b-braun-xevonta-'))){
+ filter.notes.push('The equivalent internal module diameter is a project assumption of 42 mm, selected after sensitivity analysis. Verify against the actual filter geometry.');
+}
+
 function applicable(f){return !!f&&(f.category!=='special'||f.modelRole==='hollow-fibre-dialyzer');}
-function properties(D,id,qb){const f=C.find(id);if(!applicable(f))throw Error('Not a supported blood/dialysate hollow-fibre urea device.');const p={...D.designDefaults};for(const [k,v]of Object.entries(f.properties))if(k in p)p[k]=v;if(id!=='reference'&&f.properties.Lp!==undefined)p.hydraulicBasis='inner-area';if(qb!==undefined)p.feedFlow_mLmin=qb;if(totalLengths[id]&&!p.totalLength_mm)p.totalLength_mm=totalLengths[id];if(missingActiveLength.has(id)&&!f.properties.length_mm)p.length_mm=0;return p;}
+function properties(D,id,qb){const f=C.find(id);if(!applicable(f))throw Error('Not a supported blood/dialysate hollow-fibre urea device.');const p={...D.designDefaults};for(const [k,v]of Object.entries(f.properties))if(k in p)p[k]=v;if(id!=='reference'&&f.properties.Lp!==undefined)p.hydraulicBasis='inner-area';if(id.startsWith('b-braun-xevonta-'))p.shellDiameter_mm=xevontaModuleDiameter;if(qb!==undefined)p.feedFlow_mLmin=qb;if(totalLengths[id]&&!p.totalLength_mm)p.totalLength_mm=totalLengths[id];if(missingActiveLength.has(id)&&!f.properties.length_mm)p.length_mm=0;return p;}
 function comparable(f){return applicable(f)?f.benchmarks.filter(b=>b.qf===0):[];}
 function exclusionReasons(f){const out=[];if(!applicable(f))out.push('Not a blood/dialysate urea dialyzer');if(!f.benchmarks.some(b=>b.qf===0))out.push('No explicitly documented zero-net-UF urea point');return out;}
 function profile(D,id,p){
