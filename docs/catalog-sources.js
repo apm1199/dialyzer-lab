@@ -40,6 +40,55 @@ for(const [size,area_m2,length_mm,fiberCount,shellDiameter_mm,totalLength_mm,ure
   record(id,{area_m2,length_mm,fiberCount,shellDiameter_mm,totalLength_mm,diameter_um:200,thickness_um:30},phylther,'Uses effective fibre length and the minimum reported internal housing diameter as the equivalent bore. The nominal area is separate from the area calculated from fibre geometry.');
  }
 }
+// Exploratory Multiflow scenarios combine nominal AN69 M-set performance with historical geometry.
+const multiflowClearance={
+ label:'Baxter AN69 M60/M100/M150 and ST sets specification, July 2020',
+ url:'https://usrenalacute.baxter.com/sites/g/files/ebysai3231/files/2020-09/AN69ST_Sets_Spec_Sheet.pdf',
+ page:2
+};
+const multiflow60Geometry={
+ label:'Rambod et al. 2010, historical Multiflow M60 geometry; version match unresolved',
+ url:'https://doi.org/10.1186/1475-925X-9-21',location:'Numerical Model'
+};
+const multiflow100Geometry={
+ label:'FDA K980386, historical Multiflow 100 geometry; version match unresolved',
+ url:'https://www.accessdata.fda.gov/cdrh_docs/pdf/k980386.pdf',location:'Device Description'
+};
+for(const spec of [
+ {size:60,area:0.6,length:150,shell:33,qb:100,qd:[17,42,67],clearance:[17,39,54],geometry:multiflow60Geometry,count:4400},
+ {size:100,area:0.9,length:270,qb:150,qd:[17,42,67,133],clearance:[17,41,63,95],geometry:multiflow100Geometry,count:6000}
+]){
+ const properties={area_m2:spec.area,length_mm:spec.length,diameter_um:240,thickness_um:50};
+ if(spec.shell)properties.shellDiameter_mm=spec.shell;
+ C.filters.push({
+  id:'hospal-multiflow-'+spec.size,
+  name:'Multiflow '+spec.size+' (M'+spec.size+' AN69 scenario)',
+  manufacturer:'Hospal / Gambro',category:'acute-crrt',material:'AN69 acrylonitrile / sodium methallyl sulfonate copolymer',
+  properties,
+  source:{file:multiflowClearance.label,page:multiflowClearance.page,url:multiflowClearance.url},
+  geometryFieldSources:{
+   area_m2:{label:multiflowClearance.label,url:multiflowClearance.url,location:'Physical characteristics, p. 1'},
+   diameter_um:{label:multiflowClearance.label,url:multiflowClearance.url,location:'Physical characteristics, p. 1'},
+   thickness_um:{label:multiflowClearance.label,url:multiflowClearance.url,location:'Physical characteristics, p. 1'},
+   length_mm:spec.geometry,
+   ...(spec.shell?{shellDiameter_mm:spec.geometry}:{})
+  },
+  notes:[
+   'Exploratory scenario: zero-UF urea benchmarks are from the 2020 AN69 M'+spec.size+' set. Historical Hospal Multiflow geometry is used; matching product editions remains unresolved.',
+   'Nominal membrane area is authoritative. Fibre count is calculated from area, bore and active length. The historical reported count ('+spec.count+') is not imposed because it is inconsistent with that area and the listed dimensions.',
+   'Active fibre length '+spec.length+' mm is taken from '+spec.geometry.label+'.',
+   spec.shell?'The 33 mm internal housing diameter is reported for the historical M60 specimen.':'The internal housing diameter is assumed to be 40 mm; verify the actual module.',
+   'Clearance was measured in saline solution at 37°C and zero net UF, with a manufacturer ±10% urea tolerance. Dialysate flow values follow the rounded mL/min entries in the performance table.',
+   'Hydraulic input uses the shared assumed module conductance of 35 mL/(h·mmHg). A measured pristine-water permeance for this exact version remains unresolved.'
+  ],
+  benchmarks:spec.clearance.map((k,i)=>({qb:spec.qb,qd:spec.qd[i],qf:0,k,lower:k*0.9,upper:k*1.1,
+   uncertaintyKind:'manufacturer-tolerance',uncertaintyNote:'Manufacturer ±10% in-vitro urea clearance tolerance; not a statistical confidence interval.'})),
+  protocol:{clearanceTestFluid:'water',cvvhdIndicated:true,validationEligible:true,
+   evidence:[{file:multiflowClearance.label,page:2}],
+   verifiedClearanceSource:{medium:'saline solution, 37°C',label:multiflowClearance.label,url:multiflowClearance.url,page:2,qf:0},
+   geometryVersionMatch:'unresolved'}
+ });
+}
 for(const r of corrections)if(r.values.fiberCount&&!C.reportedCounts.some(x=>x.name===C.find(r.id).name))C.reportedCounts.push({name:C.find(r.id).name,count:r.values.fiberCount,source:r.source.label+' · '+r.source.location,scope:'Model-specific reported count; area calculated from count and dimensions may differ from nominal area.'});
 const api={...C,geometryCorrections:corrections};if(typeof module!=='undefined'&&module.exports)module.exports=api;root.DialyzerCatalog=api;
 })(typeof window!=='undefined'?window:globalThis);
