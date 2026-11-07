@@ -79,7 +79,7 @@ for(const spec of [
    'Active fibre length '+spec.length+' mm is taken from '+spec.geometry.label+'.',
    spec.shell?'The 33 mm internal housing diameter is reported for the historical M60 specimen.':'The internal housing diameter is assumed to be 40 mm; verify the actual module.',
    'Clearance was measured in saline solution at 37°C and zero net UF, with a manufacturer ±10% urea tolerance. Dialysate flow values follow the rounded mL/min entries in the performance table.',
-   'Hydraulic input uses the shared assumed module conductance of 35 mL/(h·mmHg). A measured pristine-water permeance for this exact version remains unresolved.'
+   'Hydraulic input uses project-supplied Lp = 21.33 mL/(h·mmHg·m²) on the model inner-area basis. The primary measurement source and conditions remain to be documented.'
   ],
   benchmarks:spec.clearance.map((k,i)=>({qb:spec.qb,qd:spec.qd[i],qf:0,k,lower:k*0.9,upper:k*1.1,
    uncertaintyKind:'manufacturer-tolerance',uncertaintyNote:'Manufacturer ±10% in-vitro urea clearance tolerance; not a statistical confidence interval.'})),
